@@ -116,7 +116,7 @@ def _details(child: dict) -> list[str]:
     return [f"{label} : {child[key].strip()}" for key, label in labels if child.get(key, "").strip()]
 
 
-def _age_phrase(child: dict, today: date) -> str:
+def age_label(child: dict, today: date) -> str:
     months = age_in_months(child.get("naissance", ""), today)
     if months is None:
         return ""
@@ -157,7 +157,7 @@ def brief(children: list[dict], occasion: str | None, recent_titles: list[str],
     else:
         child = children[0]
         girl = child.get("accord", "elle") == "elle"
-        age = _age_phrase(child, today)
+        age = age_label(child, today)
         who = f"{child['prenom']}, {'une petite fille' if girl else 'un petit garçon'}"
         who += f" de {age}" if age else ""
         if occasion is None and rng.random() < 0.35:

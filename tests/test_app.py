@@ -69,7 +69,7 @@ def test_print_then_reprint(client):
     assert client.post(f"/api/histoires/{story_id}/imprimer").status_code == 200
     assert len(client.printed) == 2 and client.printed[0].width == 512
     state = client.get("/api/etat").json()
-    assert [h["id"] for h in state["histoires"]] == [story_id]
+    assert state["derniere"]["id"] == story_id
     assert state["restantes"] == 2
 
 
@@ -103,7 +103,61 @@ def test_printer_problem_is_reported(client, monkeypatch):
     monkeypatch.setattr(printer, "status", lambda host, port: printer.Status(False, "Plus de papier."))
     response = client.post(f"/api/histoires/{story_id}/imprimer")
     assert response.status_code == 503 and response.json()["detail"] == "Plus de papier."
-    assert client.get("/api/etat").json()["histoires"] == []
+    assert client.get("/api/etat").json()["derniere"] is None
+    assert client.get("/api/histoires").json() == []
+
+
+def _printed(client, child_id):
+    story_id = client.post("/api/histoires", json={"enfants": [child_id]}).json()["id"]
+    assert client.post(f"/api/histoires/{story_id}/imprimer").status_code == 200
+    return story_id
+
+
+def test_state_gives_ages_for_the_cards(client):
+    _children(client, LOU, {"prenom": "Sans date"})
+    ages = [c["age"] for c in client.get("/api/etat").json()["enfants"]]
+    assert ages[0].endswith("ans") or ages[0].endswith("mois")
+    assert ages[1] == ""
+
+
+def test_history_lists_only_printed_stories(client):
+    lou, = _children(client, LOU)
+    client.post("/api/histoires", json={"enfants": [lou]})
+    printed = _printed(client, lou)
+    assert [h["id"] for h in client.get("/api/histoires").json()] == [printed]
+
+
+def test_favorites(client):
+    lou, = _children(client, LOU)
+    first, second = _printed(client, lou), _printed(client, lou)
+    response = client.post(f"/api/histoires/{first}/favori", json={"favori": True})
+    assert response.json()["favori"] is True
+    assert [h["id"] for h in client.get("/api/histoires?favoris=true").json()] == [first]
+    assert [h["id"] for h in client.get("/api/etat").json()["favoris"]] == [first]
+    client.post(f"/api/histoires/{first}/favori", json={"favori": False})
+    assert client.get("/api/histoires?favoris=true").json() == []
+    assert client.get(f"/api/histoires/{second}").json()["favori"] is False
+
+
+def test_delete_hides_the_story_but_keeps_the_daily_count(client):
+    lou, = _children(client, LOU)
+    story_id = _printed(client, lou)
+    assert client.delete(f"/api/histoires/{story_id}").status_code == 200
+    assert client.get(f"/api/histoires/{story_id}").status_code == 404
+    assert client.post(f"/api/histoires/{story_id}/imprimer").status_code == 404
+    assert client.get("/api/histoires").json() == []
+    assert client.get("/api/etat").json()["restantes"] == 2
+
+
+def test_reprint_moves_a_story_back_to_the_top(client):
+    lou, = _children(client, LOU)
+    first, second = _printed(client, lou), _printed(client, lou)
+    client.post(f"/api/histoires/{first}/imprimer")
+    assert [h["id"] for h in client.get("/api/histoires").json()] == [first, second]
+
+
+def test_fonts_are_served_locally(client):
+    assert client.get("/fonts/Nunito.ttf").status_code == 200
 
 
 def test_printer_state_is_cached_between_pages(client, monkeypatch):

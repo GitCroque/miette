@@ -22,6 +22,7 @@ from . import config, printer, story, ticket
 from .store import Store, StoredStory
 
 STATIC = Path(__file__).parent / "static"
+FONTS = Path(__file__).parent / "fonts"
 MAX_CHILDREN = 6
 
 log = logging.getLogger("miette")
@@ -53,6 +54,8 @@ def printer_status(fresh: bool = False) -> printer.Status:
 
 app = FastAPI(title="Miette", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+# Les polices des tickets servent aussi à la page : rien n'est chargé ailleurs.
+app.mount("/fonts", StaticFiles(directory=FONTS), name="fonts")
 
 
 class Child(BaseModel):
@@ -65,6 +68,10 @@ class Child(BaseModel):
     creche: str = Field("", max_length=80)
     nounou: str = Field("", max_length=80)
     copains: str = Field("", max_length=120)
+
+
+class Favorite(BaseModel):
+    favori: bool
 
 
 class StoryRequest(BaseModel):
@@ -90,6 +97,7 @@ def _public(entry: StoredStory) -> dict:
         "occasion": entry.occasion,
         "date": entry.created,
         "imprimee": entry.printed,
+        "favori": entry.favorite,
     }
 
 
@@ -115,16 +123,20 @@ def healthz() -> dict:
 
 @app.get("/api/etat")
 def state() -> dict:
+    """Tout ce que l'accueil affiche, en un seul appel."""
     status = printer_status()
+    last = store.printed(1)
     return {
         "imprimante": status.message,
         "prete": status.ready,
         "papier_bas": status.paper_low,
         "cle": bool(settings.openrouter_key),
         "restantes": max(0, settings.daily_limit - store.written_today()),
-        "enfants": [{"id": c["id"], "prenom": c["prenom"]} for c in store.children()],
+        "enfants": [{"id": c["id"], "prenom": c["prenom"], "age": story.age_label(c, date.today())}
+                    for c in store.children()],
         "occasions": story.OCCASIONS,
-        "histoires": [_public(e) for e in store.printed()],
+        "derniere": _public(last[0]) if last else None,
+        "favoris": [_public(e) for e in store.printed(3, favorites_only=True)],
     }
 
 
@@ -138,6 +150,36 @@ def save_children(children: list[Child]) -> list[dict]:
     if len(children) > MAX_CHILDREN:
         raise HTTPException(422, f"{MAX_CHILDREN} fiches au plus.")
     return store.save_children([c.model_dump() for c in children])
+
+
+@app.get("/api/histoires")
+def list_stories(favoris: bool = False) -> list[dict]:
+    """L'historique : les histoires imprimées, jamais les aperçus écartés."""
+    return [_public(e) for e in store.printed(500, favorites_only=favoris)]
+
+
+@app.get("/api/histoires/{story_id}")
+def read_story(story_id: str) -> dict:
+    entry = store.story(story_id)
+    if entry is None:
+        raise HTTPException(404, "Histoire introuvable.")
+    return _public(entry)
+
+
+@app.post("/api/histoires/{story_id}/favori")
+def set_favorite(story_id: str, body: Favorite) -> dict:
+    if store.story(story_id) is None:
+        raise HTTPException(404, "Histoire introuvable.")
+    store.set_favorite(story_id, body.favori)
+    return _public(store.story(story_id))
+
+
+@app.delete("/api/histoires/{story_id}")
+def delete_story(story_id: str) -> dict:
+    if store.story(story_id) is None:
+        raise HTTPException(404, "Histoire introuvable.")
+    store.delete(story_id)
+    return {"ok": True}
 
 
 @app.post("/api/histoires")

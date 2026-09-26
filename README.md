@@ -7,10 +7,14 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
 
 ## Ce que fait l'app
 
-- Une page unique, pensée pour l'écran d'accueil de l'iPhone : choisir un
-  enfant (ou plusieurs), puis Surprise ou une occasion (anniversaire, fêtes,
-  voyage et visites, premières fois), lire l'aperçu, imprimer ou en demander
+- Une page unique qui s'adapte à la largeur : barre d'onglets sur téléphone,
+  navigation en haut sur iPad, barre latérale sur ordinateur. L'accueil propose
+  une carte Surprise par enfant et une pour tous ensemble, les occasions
+  (anniversaire, fêtes, voyage et visites, premières fois), la dernière
+  histoire et les favoris. On lit l'aperçu, puis on imprime ou on en demande
   une autre.
+- Un historique des histoires imprimées : relire, réimprimer, mettre en
+  favori, supprimer. Sur ordinateur, la liste et la lecture côte à côte.
 - Une fiche par enfant dans les réglages : prénom, mois de naissance, doudou,
   animaux de la maison, crèche, nounou, copains. L'âge calculé règle la
   longueur et le vocabulaire, les détails se glissent dans les histoires.
@@ -31,6 +35,8 @@ Développé et mesuré sur une **Epson TM-T88VI** (rouleau de 80 mm, Ethernet) :
 plus large que 512 points est tronquée sans avertissement : les valeurs sont
 dans `miette/ticket.py`, à adapter pour une autre machine. `python-escpos` n'a
 pas de profil TM-T88VI, celui de la TM-T88V a les mêmes caractéristiques.
+La machine n'accepte qu'une connexion à la fois sur le port 9100 : l'app
+sérialise tous ses accès et garde l'état affiché quelques secondes en cache.
 
 ## Configuration
 

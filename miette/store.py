@@ -3,7 +3,8 @@
 Les fiches (prénoms, doudous, crèche, copains) ne vivent que là, jamais dans
 le dépôt. Le carnet garde chaque histoire écrite, imprimée ou non : il sert
 à réimprimer sans repayer, à éviter les redites et à compter les histoires
-du jour pour le plafond quotidien.
+du jour pour le plafond quotidien. Une histoire supprimée depuis l'historique
+est seulement marquée : elle reste comptée dans le plafond du jour.
 """
 
 from __future__ import annotations
@@ -30,9 +31,18 @@ CREATE TABLE IF NOT EXISTS histoires (
     paragraphes TEXT NOT NULL,
     modele TEXT NOT NULL,
     mots INTEGER NOT NULL,
-    imprimee TEXT
+    imprimee TEXT,
+    favori INTEGER NOT NULL DEFAULT 0,
+    supprimee TEXT
 );
 """
+
+# Colonnes ajoutées après la première mise en service (2026-09-26) : une base
+# plus ancienne les reçoit à l'ouverture.
+LATER_COLUMNS = {
+    "favori": "INTEGER NOT NULL DEFAULT 0",
+    "supprimee": "TEXT",
+}
 
 
 @dataclass(frozen=True)
@@ -46,6 +56,7 @@ class StoredStory:
     model: str
     words: int
     printed: str | None
+    favorite: bool = False
 
 
 class Store:
@@ -56,6 +67,10 @@ class Store:
         self._lock = threading.Lock()
         with self._lock:
             self._db.executescript(SCHEMA)
+            present = {row["name"] for row in self._db.execute("PRAGMA table_info(histoires)")}
+            for column, definition in LATER_COLUMNS.items():
+                if column not in present:
+                    self._db.execute(f"ALTER TABLE histoires ADD COLUMN {column} {definition}")
             self._db.commit()
 
     # Fiches enfants
@@ -89,7 +104,8 @@ class Store:
         )
         with self._lock:
             self._db.execute(
-                "INSERT INTO histoires VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+                "INSERT INTO histoires (id, cree, enfants, occasion, titre, paragraphes, modele, mots) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (story.id, story.created, json.dumps(children, ensure_ascii=False), occasion,
                  title, json.dumps(story.paragraphs, ensure_ascii=False), model, words),
             )
@@ -102,16 +118,30 @@ class Store:
                              (datetime.now().isoformat(timespec="seconds"), story_id))
             self._db.commit()
 
+    def set_favorite(self, story_id: str, favorite: bool) -> None:
+        with self._lock:
+            self._db.execute("UPDATE histoires SET favori = ? WHERE id = ?", (int(favorite), story_id))
+            self._db.commit()
+
+    def delete(self, story_id: str) -> None:
+        with self._lock:
+            self._db.execute("UPDATE histoires SET supprimee = ? WHERE id = ?",
+                             (datetime.now().isoformat(timespec="seconds"), story_id))
+            self._db.commit()
+
     def story(self, story_id: str) -> StoredStory | None:
         with self._lock:
-            row = self._db.execute("SELECT * FROM histoires WHERE id = ?", (story_id,)).fetchone()
+            row = self._db.execute(
+                "SELECT * FROM histoires WHERE id = ? AND supprimee IS NULL", (story_id,)
+            ).fetchone()
         return _story(row) if row else None
 
-    def printed(self, count: int = 5) -> list[StoredStory]:
+    def printed(self, count: int = 5, favorites_only: bool = False) -> list[StoredStory]:
+        """Histoires imprimées, la dernière imprimée (ou réimprimée) en tête."""
+        where = "imprimee IS NOT NULL AND supprimee IS NULL" + (" AND favori = 1" if favorites_only else "")
         with self._lock:
             rows = self._db.execute(
-                "SELECT * FROM histoires WHERE imprimee IS NOT NULL ORDER BY imprimee DESC LIMIT ?",
-                (count,),
+                f"SELECT * FROM histoires WHERE {where} ORDER BY imprimee DESC LIMIT ?", (count,)
             ).fetchall()
         return [_story(r) for r in rows]
 
@@ -136,5 +166,5 @@ def _story(row: sqlite3.Row) -> StoredStory:
         id=row["id"], created=row["cree"], children=json.loads(row["enfants"]),
         occasion=row["occasion"], title=row["titre"],
         paragraphs=json.loads(row["paragraphes"]), model=row["modele"],
-        words=row["mots"], printed=row["imprimee"],
+        words=row["mots"], printed=row["imprimee"], favorite=bool(row["favori"]),
     )

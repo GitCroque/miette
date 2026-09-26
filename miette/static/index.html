@@ -8,476 +8,801 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Miette">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#f7efe2" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1f1a15" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F7EFE2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1F1A15" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/static/icon-180.png">
   <style>
+    /* Polices servies par Miette lui-même : les mêmes que sur le ticket. */
+    @font-face { font-family: "Fredoka"; src: url(/fonts/Fredoka.ttf) format("truetype"); font-weight: 300 700; font-display: swap; }
+    @font-face { font-family: "Nunito"; src: url(/fonts/Nunito.ttf) format("truetype"); font-weight: 200 1000; font-display: swap; }
+    @font-face { font-family: "Gelasio"; src: url(/fonts/Gelasio.ttf) format("truetype"); font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "Gelasio"; src: url(/fonts/Gelasio-Italic.ttf) format("truetype"); font-weight: 400 700; font-style: italic; font-display: swap; }
+
     :root {
-      --paper: #f7efe2;
-      --card: #fffaf2;
-      --ink: #2b231c;
-      --soft: #7a6a5a;
-      --line: #e6d8c3;
-      --accent: #d9603b;
-      --accent-ink: #ffffff;
-      --ok: #2f7d4f;
-      --warn: #b7791f;
-      --bad: #b83a2e;
-      --radius: 22px;
+      --paper: #F7EFE2; --paper-2: #EFE5D3; --card: #FFFAF2;
+      --ink: #2B231C; --ink-2: #3A3027; --soft: #6F5F50; --mute: #8C7B6A;
+      --line: #E6D8C3; --line-2: #D9C8AE;
+      --accent: #C2532F; --accent-text: #A8431F; --accent-soft: #F6DCCF; --accent-deep: #7E3115;
+      --inverse-bg: #2B231C; --inverse-ink: #F7EFE2; --inverse-soft: #D9C8AE;
+      --ok: #2F7D4F; --ok-soft: #DCEEDF; --ok-text: #1F5C38;
+      --warn: #B7791F; --warn-soft: #F7E7C6; --warn-text: #6E460A;
+      --bad: #B83A2E; --bad-soft: #F6D9D3; --bad-text: #8E2F1E;
+      --danger: #A33A22; --danger-line: #E8C4B6;
+      --r: 22px;
       color-scheme: light dark;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --paper: #1f1a15;
-        --card: #2a231d;
-        --ink: #f3e9dc;
-        --soft: #b3a38f;
-        --line: #3d342b;
-        --accent: #ec7a52;
-        --ok: #5fbf85;
-        --warn: #e0a84a;
-        --bad: #ec6a5c;
+        --paper: #1F1A15; --paper-2: #29221B; --card: #2A231D;
+        --ink: #F3E9DC; --ink-2: #E4D8C8; --soft: #B8A893; --mute: #9A8A77;
+        --line: #3D342B; --line-2: #4D4237;
+        --accent-text: #F0936F; --accent-soft: #4A2A1E; --accent-deep: #F6C9B6;
+        --inverse-bg: #F3E9DC; --inverse-ink: #2B231C; --inverse-soft: #6F5F50;
+        --ok-soft: #1E3527; --ok-text: #8FD4A8;
+        --warn-soft: #3D2F14; --warn-text: #F0C77A;
+        --bad-soft: #43201A; --bad-text: #F4A393;
+        --danger: #F08A73; --danger-line: #5A2E24;
       }
     }
+
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; background: var(--paper); color: var(--ink); }
-    body {
-      font: 18px/1.45 ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif;
-      padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
-      max-width: 560px;
-      margin: 0 auto;
+    body { font: 17px/1.45 Nunito, system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    a { color: var(--accent-text); }
+    h1, h2, h3 { margin: 0; }
+    [hidden] { display: none !important; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    /* Cadre : téléphone par défaut, iPad à partir de 700 px, ordinateur à partir de 1100 px */
+    .app { min-height: 100vh; min-height: 100dvh; }
+    .logo { font-family: Fredoka, sans-serif; font-weight: 700; font-size: 32px; letter-spacing: -0.5px; color: var(--ink); text-decoration: none; }
+    .logo span { color: var(--accent); }
+    .sidebar { display: none; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(18px, env(safe-area-inset-top)) 20px 0; }
+    .top-nav { display: none; }
+    main { padding: 18px 20px calc(104px + env(safe-area-inset-bottom)); }
+    .tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+      padding: 8px 20px max(14px, env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line);
     }
-    header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 18px; }
-    h1 { font-size: 34px; margin: 0; letter-spacing: -0.5px; }
-    h1 span { color: var(--accent); }
-    .head-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .pill {
-      display: inline-flex; align-items: center; gap: 8px; min-width: 0;
-      font-size: 15px; padding: 7px 12px; border-radius: 999px;
-      background: var(--card); border: 1px solid var(--line); color: var(--soft);
+    .tabbar a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; border-radius: 14px; color: var(--soft); font-weight: 700; font-size: 12px; text-decoration: none; }
+    .tabbar a[aria-current="page"] { color: var(--accent-text); font-weight: 800; }
+    body.focus .tabbar { display: none; }
+    body.focus main { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+
+    .pill { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 12px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--paper-2); color: var(--soft); }
+    .pill span.txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pill::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--mute); }
+    .pill.ok { background: var(--ok-soft); color: var(--ok-text); } .pill.ok::before { background: var(--ok); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn-text); } .pill.warn::before { background: var(--warn); }
+    .pill.bad { background: var(--bad-soft); color: var(--bad-text); } .pill.bad::before { background: var(--bad); }
+
+    @media (min-width: 700px) {
+      .tabbar { display: none; }
+      .topbar { padding: 28px 36px 0; max-width: 1180px; margin: 0 auto; }
+      .logo { font-size: 36px; }
+      .top-nav { display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: var(--paper-2); margin-left: auto; }
+      .top-nav a { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 12px; color: var(--soft); font-weight: 700; font-size: 15px; text-decoration: none; }
+      .top-nav a[aria-current="page"] { background: var(--card); color: var(--ink); font-weight: 800; box-shadow: 0 1px 2px rgba(43,35,28,.12); }
+      main { padding: 26px 36px 56px; max-width: 1180px; margin: 0 auto; }
+      body.focus main { padding-bottom: 56px; }
     }
-    .pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .pill::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--soft); flex: none; }
-    .pill.ok::before { background: var(--ok); }
-    .pill.warn::before { background: var(--warn); }
-    .pill.bad::before { background: var(--bad); }
-    .icon-btn {
-      flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
-      background: var(--card); color: var(--ink); font-size: 20px; display: grid; place-items: center; text-decoration: none;
+    @media (min-width: 1100px) {
+      .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+      .topbar { display: none; }
+      .sidebar {
+        display: flex; flex-direction: column; gap: 28px; position: sticky; top: 0; height: 100vh; height: 100dvh;
+        padding: 28px 18px; background: var(--card); border-right: 1px solid var(--line);
+      }
+      .sidebar .logo { padding-left: 10px; }
+      .side-nav { display: flex; flex-direction: column; gap: 4px; }
+      .side-nav a { display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 12px; color: var(--ink-2); font-weight: 700; font-size: 16px; text-decoration: none; }
+      .side-nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent-deep); font-weight: 800; }
+      .printer-card { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); }
+      .printer-card .state { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; }
+      .printer-card .state::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--mute); flex: none; }
+      .printer-card .state.ok { color: var(--ok-text); } .printer-card .state.ok::before { background: var(--ok); }
+      .printer-card .state.warn { color: var(--warn-text); } .printer-card .state.warn::before { background: var(--warn); }
+      .printer-card .state.bad { color: var(--bad-text); } .printer-card .state.bad::before { background: var(--bad); }
+      .printer-card .remaining { font-size: 13px; color: var(--soft); font-weight: 600; }
+      main { padding: 40px 48px 56px; margin: 0; max-width: 1240px; }
     }
-    section { margin-bottom: 22px; }
-    .label { display: block; font-size: 15px; color: var(--soft); margin: 0 0 8px 4px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
-    .chip {
-      font: inherit; font-size: 19px; font-weight: 700; color: var(--ink);
-      min-height: 52px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+
+    /* Éléments communs */
+    .kicker { font-size: 15px; color: var(--soft); font-weight: 700; }
+    .big { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 28px; line-height: 1.12; }
+    @media (min-width: 700px) { .big { font-size: 38px; } }
+    .label { display: block; font-size: 14px; color: var(--soft); font-weight: 800; margin: 0 0 8px 2px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+    @media (min-width: 700px) { .card { padding: 22px; } }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 16px;
+      border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 800; font-size: 15px; text-decoration: none;
     }
-    .chip[aria-pressed=true] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-    .surprise {
-      font: inherit; font-size: 22px; font-weight: 700; width: 100%; min-height: 84px;
-      border: 0; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink);
-      display: flex; align-items: center; justify-content: center; gap: 10px;
+    .btn.dark { background: var(--inverse-bg); color: var(--inverse-ink); border-color: transparent; }
+    .btn.primary { background: var(--accent); color: #FFFFFF; border-color: transparent; }
+    .btn.danger { color: var(--danger); border-color: var(--danger-line); }
+    .btn.big-btn { min-height: 56px; font-size: 17px; border-radius: 16px; padding: 0 18px; }
+    .btn.icon-only { width: 46px; padding: 0; }
+    .grow { flex: 1; }
+    .back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px 0 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 800; font-size: 15px; text-decoration: none; }
+    .round { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink); display: grid; place-items: center; }
+    .star { color: var(--mute); background: transparent; border: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+    .star[aria-pressed="true"] { color: var(--accent); }
+    .round.star { border: 1px solid var(--line); background: var(--card); }
+    .actionbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; gap: 10px;
+      padding: 14px 20px max(20px, env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line);
     }
-    .occasions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-    .occasion {
-      font: inherit; font-size: 17px; font-weight: 600; color: var(--ink); text-align: left;
-      display: flex; align-items: center; gap: 10px; min-height: 62px; padding: 10px 14px;
-      background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    @media (min-width: 700px) { .actionbar { position: static; padding: 0; border: 0; background: none; margin-top: 20px; } }
+    .notice { font-size: 14px; color: var(--soft); text-align: center; margin: 18px 0 0; }
+    .empty { color: var(--soft); font-weight: 600; }
+
+    /* Accueil */
+    .greet { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+    .greet .pill { display: none; }
+    @media (min-width: 700px) and (max-width: 1099px) { .greet .pill { display: inline-flex; } .topbar .pill { display: none; } }
+    .kids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+    .kid {
+      display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: 132px; padding: 14px; text-align: left;
+      border-radius: var(--r); background: var(--card); border: 1px solid var(--line); color: var(--ink);
     }
-    .occasion .emoji { font-size: 26px; line-height: 1; }
-    .surprise:active, .occasion:active, .chip:active { transform: scale(.97); }
-    button { transition: transform .08s ease; }
-    button:disabled { opacity: .45; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
-    .card .meta { font-size: 14px; color: var(--soft); margin-bottom: 4px; }
-    .card h2 { margin: 0 0 10px; font-size: 23px; line-height: 1.25; }
-    .card .story p { margin: 0 0 10px; font-family: Georgia, "Times New Roman", serif; font-size: 18px; }
-    .actions { display: flex; gap: 10px; margin-top: 12px; }
-    .primary, .secondary {
-      font: inherit; font-weight: 700; font-size: 18px; border-radius: 16px; min-height: 56px; padding: 0 18px;
+    .kid .who { display: flex; align-items: center; gap: 10px; }
+    .kid .name { display: flex; flex-direction: column; }
+    .kid .name b { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 21px; line-height: 1.1; }
+    .kid .name small { font-size: 13px; color: var(--soft); font-weight: 700; }
+    .kid.together { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 72px; background: var(--inverse-bg); color: var(--inverse-ink); border-color: transparent; }
+    .kid.together .name small { color: var(--inverse-soft); }
+    .kid.together .name b { font-size: 19px; }
+    .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #FFFFFF; font-family: Fredoka, sans-serif; font-weight: 600; font-size: 20px; }
+    .avatars { display: flex; }
+    .avatars .avatar { border: 2px solid var(--inverse-bg); }
+    .avatars .avatar + .avatar { margin-left: -10px; }
+    .surprise { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; color: #FFFFFF; font-weight: 800; font-size: 15px; }
+    .kid.together .surprise { background: var(--inverse-ink); color: var(--inverse-bg); }
+    @media (min-width: 700px) {
+      .kids { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+      .kid, .kid.together { grid-column: auto; flex-direction: column; align-items: stretch; min-height: 200px; padding: 20px; border-radius: 26px; }
+      .kid .name b, .kid.together .name b { font-size: 26px; }
+      .avatar { width: 56px; height: 56px; font-size: 26px; }
+      .avatars .avatar { border-width: 3px; }
+      .avatars .avatar + .avatar { margin-left: -16px; }
+      .kid .who { flex-direction: column; align-items: flex-start; gap: 34px; }
     }
-    .primary { flex: 1; border: 0; background: var(--ink); color: var(--paper); }
-    .secondary { border: 1px solid var(--line); background: none; color: var(--ink); }
-    .done { color: var(--ok); font-weight: 700; font-size: 16px; margin-top: 10px; }
-    .ghost {
-      font: inherit; font-size: 16px; font-weight: 600; color: var(--accent);
-      background: none; border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; min-height: 44px;
+    @media (min-width: 1100px) {
+      /* La carte « ensemble » porte plusieurs prénoms : une colonne plus large. */
+      .kids.with-together { grid-template-columns: repeat(var(--n), minmax(0, 1fr)) minmax(0, 1.4fr); }
+      .kid, .kid.together { flex-direction: row; align-items: center; min-height: 116px; padding: 0 22px; border-radius: 24px; }
+      .kid.together .name b { font-size: 22px; }
+      .kid .who { flex-direction: row; align-items: center; gap: 14px; }
+      .kid .name b { font-size: 24px; }
+      .kid .surprise { align-self: center; padding: 10px 14px; }
     }
-    ul.history { list-style: none; margin: 0; padding: 0; }
-    ul.history li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
-    ul.history li:last-child { border-bottom: 0; }
-    ul.history .t { font-weight: 600; }
-    ul.history .d { font-size: 14px; color: var(--soft); }
-    .notice { font-size: 15px; color: var(--soft); text-align: center; margin-top: 8px; }
-    .error { background: color-mix(in srgb, var(--bad) 12%, var(--card)); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
-    .overlay {
-      position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 18px;
-      background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-      font-size: 20px; font-weight: 600; text-align: center; padding: 24px; z-index: 10;
+
+    .occasions { margin-top: 22px; }
+    .occ-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -20px; padding: 0 20px; scrollbar-width: none; }
+    .occ-row::-webkit-scrollbar { display: none; }
+    .occ { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 700; font-size: 15px; }
+    .occ[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+    .occ-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding: 12px; border-radius: 16px; background: var(--paper-2); }
+    .occ-pick .q { font-weight: 800; font-size: 15px; margin-right: 4px; }
+    .pick { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; color: #FFFFFF; font-weight: 800; font-size: 15px; }
+    .pick.together { background: var(--inverse-bg); color: var(--inverse-ink); }
+    @media (min-width: 700px) {
+      .occ-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; overflow: visible; }
+      .occ { flex-direction: column; align-items: flex-start; justify-content: space-between; height: 104px; padding: 16px; border-radius: 20px; font-size: 16px; font-weight: 800; text-align: left; }
     }
-    .overlay.on { display: flex; }
-    .ticket {
-      width: 88px; height: 120px; background: var(--card); border: 1px solid var(--line); border-radius: 8px 8px 2px 2px;
-      position: relative; overflow: hidden; animation: feed 1.6s ease-in-out infinite;
+    @media (min-width: 1100px) {
+      .occ-row { display: flex; }
+      .occ { flex-direction: row; align-items: center; height: 50px; padding: 0 18px; border-radius: 16px; }
     }
-    .ticket::before, .ticket::after { content: ""; position: absolute; left: 14px; right: 14px; height: 6px; border-radius: 3px; background: var(--line); }
-    .ticket::before { top: 22px; }
-    .ticket::after { top: 40px; right: 34px; }
-    @keyframes feed { 0% { transform: translateY(-14px); } 50% { transform: translateY(6px); } 100% { transform: translateY(-14px); } }
+
+    .home-bottom { display: grid; gap: 12px; margin-top: 22px; }
+    .home-bottom .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    .home-bottom .head a { font-size: 14px; font-weight: 800; text-decoration: none; }
+    .last .meta { font-size: 13px; color: var(--soft); font-weight: 700; }
+    .last h2 { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 21px; line-height: 1.2; margin: 3px 0 6px; }
+    .excerpt { font-family: Gelasio, Georgia, serif; font-size: 16px; line-height: 1.5; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .row-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .row-actions .btn { flex: 1; }
+    .favs { display: none; }
+    .fav-link { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid var(--paper-2); color: var(--ink); text-decoration: none; }
+    .fav-link:last-child { border-bottom: 0; }
+    .fav-link b { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 18px; }
+    .fav-link small { font-size: 13px; color: var(--soft); font-weight: 700; }
+    @media (min-width: 700px) {
+      .home-bottom { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+      .favs { display: block; }
+      .last h2 { font-size: 28px; }
+      .excerpt { font-size: 18px; -webkit-line-clamp: 5; }
+      .row-actions .btn { flex: none; }
+    }
+
+    /* Aperçu et lecture */
+    .view-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .view-head .titles { display: flex; align-items: center; gap: 12px; }
+    .view-head .titles b { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 20px; display: block; }
+    .view-head .titles small { font-size: 13px; color: var(--soft); font-weight: 700; }
+    .sheet { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 22px 20px; max-width: 760px; }
+    @media (min-width: 700px) { .sheet { padding: 32px 36px; } }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--paper-2); color: var(--ink-2); font-size: 13px; font-weight: 800; }
+    .chip.accent { background: var(--accent-soft); color: var(--accent-deep); }
+    .story-title { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 28px; line-height: 1.15; margin: 0 0 12px; }
+    .story { font-family: Gelasio, Georgia, serif; font-size: 18px; line-height: 1.6; color: var(--ink); }
+    .story p { margin: 0 0 12px; }
+    @media (min-width: 700px) { .story-title { font-size: 36px; } .story { font-size: 20px; line-height: 1.65; } }
+    .reader-meta { font-size: 13px; color: var(--soft); font-weight: 800; margin-bottom: 6px; }
+    .reader { max-width: 700px; }
+
+    /* Historique */
+    .hist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .count { font-size: 14px; color: var(--soft); font-weight: 700; }
+    .seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px; border-radius: 14px; background: var(--paper-2); margin: 14px 0 6px; max-width: 420px; }
+    .seg button { height: 40px; border: 0; border-radius: 11px; background: transparent; color: var(--soft); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 800; box-shadow: 0 1px 2px rgba(43,35,28,.12); }
+    .group-label { font-size: 13px; color: var(--soft); font-weight: 800; letter-spacing: .4px; text-transform: uppercase; margin: 16px 2px 8px; }
+    .list { border-radius: var(--r); background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+    .item { display: flex; align-items: center; gap: 8px; padding: 10px 8px 10px 16px; border-bottom: 1px solid var(--paper-2); }
+    .item:last-child { border-bottom: 0; }
+    .item a { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; color: var(--ink); text-decoration: none; padding: 4px 0; }
+    .item a b { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 18px; }
+    .item a small { font-size: 13px; color: var(--soft); font-weight: 700; }
+    .item.selected { background: var(--accent-soft); }
+    .item.selected a small { color: var(--accent-deep); }
+    .hist-layout { display: block; }
+    @media (min-width: 1100px) {
+      main.wide-history { max-width: none; padding: 0; }
+      .hist-layout { display: grid; grid-template-columns: 420px minmax(0, 1fr); min-height: 100vh; }
+      .hist-list { padding: 36px 24px 36px 32px; border-right: 1px solid var(--line); overflow-y: auto; max-height: 100vh; position: sticky; top: 0; }
+      .hist-reader { padding: 40px 56px; }
+      .hist-reader .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+      .hist-reader .tools { display: flex; gap: 8px; flex: none; }
+      .hist-reader .story-title { font-size: 38px; }
+      .hist-reader .story { font-size: 21px; max-width: 640px; }
+    }
 
     /* Réglages */
-    .field { display: block; margin-bottom: 12px; }
-    .field span { display: block; font-size: 14px; color: var(--soft); margin: 0 0 5px 2px; }
-    .field input {
-      width: 100%; font: inherit; font-size: 18px; color: var(--ink);
-      padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--paper);
-    }
+    .settings-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .privacy { font-size: 14px; color: var(--soft); font-weight: 600; margin: 6px 0 0; max-width: 640px; }
+    .fiches { display: grid; gap: 14px; margin-top: 20px; align-items: start; }
+    @media (min-width: 700px) { .fiches { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; } }
+    @media (min-width: 1100px) { .fiches { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .fiche { display: flex; flex-direction: column; gap: 12px; }
+    .fiche .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .fiche .top .who { display: flex; align-items: center; gap: 12px; }
+    .fiche .top b { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 22px; }
+    .fiche .avatar { width: 44px; height: 44px; font-size: 21px; }
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--soft); font-weight: 700; }
+    .field input { width: 100%; height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; }
     .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
-    .seg { display: flex; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 3px; margin-bottom: 12px; }
-    .seg button { font: inherit; font-size: 16px; border: 0; background: none; color: var(--soft); padding: 0 14px; border-radius: 11px; min-height: 44px; }
-    .seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); }
-    .child-card { margin-bottom: 14px; }
-    .child-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .child-card .top strong { font-size: 20px; }
-    .add { width: 100%; margin-bottom: 14px; }
-    .privacy { font-size: 14px; color: var(--soft); margin: 4px 4px 16px; }
-    .save-bar { position: sticky; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; }
-    [hidden] { display: none !important; }
+    .add-card { min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border-radius: var(--r); border: 2px dashed var(--line-2); background: transparent; color: var(--soft); font-weight: 800; font-size: 16px; }
+
+    /* Attente et messages */
+    .overlay {
+      position: fixed; inset: 0; z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px;
+      background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      font-family: Fredoka, sans-serif; font-weight: 600; font-size: 22px; text-align: center;
+    }
+    .overlay.on { display: flex; }
+    .ticket { width: 88px; height: 120px; background: var(--card); border: 1px solid var(--line); border-radius: 8px 8px 2px 2px; position: relative; overflow: hidden; animation: feed 1.6s ease-in-out infinite; }
+    .ticket::before, .ticket::after { content: ""; position: absolute; left: 14px; right: 14px; height: 6px; border-radius: 3px; background: var(--line); }
+    .ticket::before { top: 22px; } .ticket::after { top: 40px; right: 34px; }
+    @keyframes feed { 0%, 100% { transform: translateY(-14px); } 50% { transform: translateY(6px); } }
+    @media (prefers-reduced-motion: reduce) { .ticket { animation: none; } }
+    .toast {
+      position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); z-index: 11;
+      max-width: calc(100% - 40px); padding: 12px 18px; border-radius: 14px; background: var(--inverse-bg); color: var(--inverse-ink);
+      font-weight: 800; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    }
+    .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--bad); color: #FFFFFF; }
+    @media (min-width: 700px) { .toast { bottom: 32px; } }
   </style>
 </head>
 <body>
-  <main id="view-main">
-    <header>
-      <h1>Miette<span>.</span></h1>
-      <div class="head-right">
-        <div class="pill" id="status" role="status"><span>…</span></div>
-        <a class="icon-btn" href="#reglages" aria-label="Réglages">⚙︎</a>
+  <div class="app">
+    <aside class="sidebar">
+      <a class="logo" href="#/">Miette<span>.</span></a>
+      <nav class="side-nav" aria-label="Navigation">
+        <a href="#/" data-nav="accueil"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</a>
+        <a href="#/historique" data-nav="historique"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>Historique</a>
+        <a href="#/reglages" data-nav="reglages"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Réglages</a>
+      </nav>
+      <div class="printer-card">
+        <div class="state" id="side-status">…</div>
+        <span class="remaining" id="side-remaining"></span>
       </div>
-    </header>
+    </aside>
 
-    <section id="empty" hidden>
-      <div class="card">
-        <h2>Bienvenue</h2>
-        <p>Commence par créer une fiche pour chaque enfant : prénom, mois de naissance, doudou…</p>
-        <div class="actions"><a class="primary" href="#reglages" style="display:grid;place-items:center;text-decoration:none">Créer les fiches</a></div>
-      </div>
-    </section>
+    <div>
+      <header class="topbar">
+        <a class="logo" href="#/">Miette<span>.</span></a>
+        <nav class="top-nav" aria-label="Navigation">
+          <a href="#/" data-nav="accueil"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</a>
+          <a href="#/historique" data-nav="historique"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>Historique</a>
+          <a href="#/reglages" data-nav="reglages"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Réglages</a>
+        </nav>
+        <div class="pill" id="top-status" role="status"><span class="txt">…</span></div>
+      </header>
+      <main id="view" tabindex="-1"></main>
+    </div>
 
-    <section id="who" hidden>
-      <span class="label">Pour qui ?</span>
-      <div class="chips" id="chips"></div>
-    </section>
-
-    <section id="go" hidden>
-      <button class="surprise" id="surprise"><span>✨</span>Surprise</button>
-      <div class="occasions" id="occasions"></div>
-    </section>
-
-    <section id="preview" hidden>
-      <div class="card" id="preview-card">
-        <div class="meta" id="preview-meta"></div>
-        <h2 id="preview-title"></h2>
-        <div class="story" id="preview-text"></div>
-        <div class="actions" id="preview-actions">
-          <button class="primary" id="print">Imprimer</button>
-          <button class="secondary" id="another">Une autre</button>
-        </div>
-        <div class="done" id="preview-done" hidden>Imprimée ✓</div>
-      </div>
-    </section>
-
-    <section id="past" hidden>
-      <span class="label">Dernières histoires imprimées</span>
-      <div class="card"><ul class="history" id="history"></ul></div>
-    </section>
-
-    <p class="notice" id="notice"></p>
-  </main>
-
-  <main id="view-settings" hidden>
-    <header>
-      <a class="icon-btn" href="#" aria-label="Retour">←</a>
-      <h1 style="font-size:26px;flex:1;margin-left:4px">Réglages</h1>
-    </header>
-    <p class="privacy">Ces fiches restent sur le serveur de la maison. Les détails servent à glisser le doudou, la crèche ou les copains dans les histoires, et partent avec chaque demande vers le modèle qui écrit.</p>
-    <div id="children-forms"></div>
-    <button class="secondary add" id="add-child">＋ Ajouter un enfant</button>
-    <div class="save-bar"><button class="primary" id="save">Enregistrer</button></div>
-    <p class="notice" id="settings-notice"></p>
-  </main>
-
-  <div class="overlay" id="overlay" aria-live="polite">
-    <div class="ticket"></div>
-    <div id="overlay-text">Miette écrit l'histoire…</div>
+    <nav class="tabbar" aria-label="Navigation">
+      <a href="#/" data-nav="accueil"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Accueil</a>
+      <a href="#/historique" data-nav="historique"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>Historique</a>
+      <a href="#/reglages" data-nav="reglages"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Réglages</a>
+    </nav>
   </div>
+
+  <div class="overlay" id="overlay" aria-live="polite"><div class="ticket"></div><div id="overlay-text">Miette écrit l'histoire…</div></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
     const $ = (selector) => document.querySelector(selector);
-    const store = {
-      get(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } },
-      set(key, value) { try { localStorage.setItem(key, value); } catch {} },
+    const esc = (text) => String(text ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const session = {
+      get(key) { try { return JSON.parse(sessionStorage.getItem(key)); } catch { return null; } },
+      set(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch {} },
     };
-    const EMOJIS = { "anniversaire": "🎂", "fetes": "🎄", "voyage": "🧳", "premieres-fois": "🌱" };
-    const FIELDS = [
-      ["prenom", "Prénom", "Prénom"],
-      ["naissance", "Mois de naissance", ""],
-      ["doudou", "Doudou", "Lapinou, un lapin gris"],
-      ["animaux", "Animaux de la maison", "Pistache, le chat"],
-      ["creche", "Crèche ou école", "la crèche des Lilas"],
-      ["nounou", "Nounou", ""],
-      ["copains", "Copains", "Léo, Inès"],
-    ];
 
-    let state = null;
-    let busy = false;
-    let current = null;       // histoire affichée en aperçu
-    let lastRequest = null;   // pour « Une autre »
-    let selected = JSON.parse(store.get("miette.enfants", "[]"));
-
-    function escapeHtml(text) {
-      return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const PATHS = {
+      sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+      printer: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+      star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+      trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+      back: '<path d="M15 5l-7 7 7 7"/>',
+      again: '<path d="M20 12a8 8 0 1 1-2.3-5.7L20 8"/><path d="M20 3v5h-5"/>',
+      book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      anniversaire: '<path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c2 1.5 4 1.5 7 0s5-1.5 7 0M12 12V8"/>',
+      fetes: '<path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/>',
+      voyage: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/>',
+      "premieres-fois": '<path d="M12 21v-9"/><path d="M12 12C12 8 9 6 5 6c0 4 3 6 7 6z"/><path d="M12 10c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+    };
+    function icon(name, size = 20, options = {}) {
+      const fill = options.fill ? "currentColor" : "none";
+      const color = options.color || "currentColor";
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PATHS[name]}</svg>`;
     }
-    function when(iso) {
-      const d = new Date(iso);
-      return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    // Une couleur par enfant, dans l'ordre des fiches ; texte blanc lisible sur chacune.
+    const COLORS = ["#C2532F", "#2F6B70", "#6B5B95", "#86651C", "#3E6A2E", "#8A3F66"];
+    const OCC_COLORS = { "anniversaire": "#C2532F", "fetes": "#2F6B70", "voyage": "#C2532F", "premieres-fois": "#2F6B70" };
+    const wide = window.matchMedia("(min-width: 1100px)");
+
+    let etat = null;
+    let draft = session.get("miette.apercu");
+    let lastRequest = session.get("miette.demande");
+    let pendingOccasion = null;
+    let historyItems = null;
+    let historyFilter = "toutes";
+    let settingsDrafts = [];
+    let busy = false;
+
+    async function api(method, url, body) {
+      const response = await fetch(url, {
+        method,
+        headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      let data = null;
+      try { data = await response.json(); } catch {}
+      if (!response.ok) {
+        const detail = data && data.detail;
+        const message = Array.isArray(detail) ? "Champ invalide : " + ((detail[0] && detail[0].loc) || []).slice(-1)[0] : detail;
+        throw new Error(message || `Erreur ${response.status}`);
+      }
+      return data;
+    }
+
+    let toastTimer = null;
+    function toast(message, isError) {
+      const el = $("#toast");
+      el.textContent = message;
+      el.classList.toggle("error", !!isError);
+      el.classList.add("on");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove("on"), isError ? 5000 : 2600);
     }
     function setBusy(on, text) {
       busy = on;
       $("#overlay").classList.toggle("on", on);
       if (text) $("#overlay-text").textContent = text;
-      document.querySelectorAll("button").forEach((b) => (b.disabled = on));
-    }
-    async function api(method, url, body) {
-      const response = await fetch(url, {
-        method,
-        headers: body ? { "Content-Type": "application/json" } : {},
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      let data = {};
-      try { data = await response.json(); } catch {}
-      if (!response.ok) {
-        const detail = Array.isArray(data.detail) ? "Champ invalide : " + (data.detail[0]?.loc || []).slice(-1)[0] : data.detail;
-        throw new Error(detail || `Erreur ${response.status}`);
-      }
-      return data;
     }
 
-    // Vue principale
+    // Dates
 
-    function renderChips() {
-      const known = state.enfants.map((c) => c.id);
-      selected = selected.filter((id) => known.includes(id));
-      if (!selected.length && known.length) selected = [known[0]];
-      store.set("miette.enfants", JSON.stringify(selected));
-      const chips = $("#chips");
-      chips.innerHTML = "";
-      state.enfants.forEach((child) => {
-        const b = document.createElement("button");
-        b.className = "chip";
-        b.textContent = child.prenom;
-        b.setAttribute("aria-pressed", String(selected.includes(child.id)));
-        b.addEventListener("click", () => {
-          if (selected.includes(child.id)) {
-            if (selected.length > 1) selected = selected.filter((id) => id !== child.id);
-          } else {
-            selected.push(child.id);
-          }
-          renderChips();
-        });
-        chips.appendChild(b);
-      });
+    function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
+    function whenLabel(iso) {
+      const d = new Date(iso), now = new Date();
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      if (sameDay(d, now)) return d.getHours() >= 18 ? "ce soir" : "aujourd'hui";
+      if (sameDay(d, yesterday)) return "hier";
+      if (now - d < 6 * 86400000) return d.toLocaleDateString("fr-FR", { weekday: "long" });
+      return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
     }
-
-    function renderOccasions() {
-      const box = $("#occasions");
-      if (box.childElementCount) return;
-      Object.entries(state.occasions).forEach(([key, label]) => {
-        const b = document.createElement("button");
-        b.className = "occasion";
-        b.innerHTML = `<span class="emoji">${EMOJIS[key] || "✨"}</span>${escapeHtml(label)}`;
-        b.addEventListener("click", () => write({ enfants: [...selected], occasion: key }));
-        box.appendChild(b);
-      });
+    function longDate(iso) { return new Date(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); }
+    function kicker() {
+      const now = new Date();
+      const day = now.toLocaleDateString("fr-FR", { weekday: "long" });
+      const part = now.getHours() < 12 ? "matin" : now.getHours() < 18 ? "après-midi" : "soir";
+      return day.charAt(0).toUpperCase() + day.slice(1) + " " + part;
     }
-
-    function showPreview(story, isError) {
-      current = isError ? null : story;
-      $("#preview").hidden = false;
-      $("#preview-card").classList.toggle("error", !!isError);
-      const occasion = story.occasion ? " · " + (state.occasions[story.occasion] || "") : "";
-      $("#preview-meta").textContent = isError ? "" : `Pour ${story.pour}${occasion}`;
-      $("#preview-title").textContent = story.titre;
-      $("#preview-text").innerHTML = story.texte.split(/\n\s*\n/).map((p) => `<p>${escapeHtml(p)}</p>`).join("");
-      $("#preview-actions").hidden = !!isError && !lastRequest;
-      $("#print").hidden = !!isError;
-      $("#print").textContent = story.imprimee ? "Réimprimer" : "Imprimer";
-      $("#preview-done").hidden = !story.imprimee;
-      $("#preview").scrollIntoView({ behavior: "smooth", block: "start" });
+    function metaLine(story) {
+      return [story.pour, story.occasion && etat ? etat.occasions[story.occasion] : "", whenLabel(story.imprimee || story.date)].filter(Boolean).join(" · ");
     }
+    function paragraphs(text) { return text.split(/\n\s*\n/).map((p) => `<p>${esc(p)}</p>`).join(""); }
 
-    async function write(request) {
-      if (busy) return;
-      lastRequest = request;
-      setBusy(true, "Miette écrit l'histoire…");
+    // État de l'imprimante, dans la barre du haut ou la barre latérale
+
+    async function refreshState() {
       try {
-        showPreview(await api("POST", "/api/histoires", request), false);
-      } catch (error) {
-        showPreview({ titre: "Pas d'histoire cette fois", texte: error.message }, true);
-      } finally {
-        setBusy(false);
-        refresh();
-      }
-    }
-
-    async function printStory(id) {
-      if (busy) return;
-      setBusy(true, "Impression…");
-      try {
-        const story = await api("POST", `/api/histoires/${id}/imprimer`);
-        if (current && current.id === id) showPreview(story, false);
-      } catch (error) {
-        showPreview({ titre: "Impression impossible", texte: error.message }, true);
-      } finally {
-        setBusy(false);
-        refresh();
-      }
-    }
-
-    $("#surprise").addEventListener("click", () => write({ enfants: [...selected], occasion: null }));
-    $("#another").addEventListener("click", () => lastRequest && write(lastRequest));
-    $("#print").addEventListener("click", () => current && printStory(current.id));
-
-    async function refresh() {
-      try {
-        state = await api("GET", "/api/etat");
+        etat = await api("GET", "/api/etat");
       } catch {
-        $("#status").className = "pill bad";
-        $("#status").innerHTML = "<span>Miette injoignable</span>";
+        $("#top-status").className = "pill bad";
+        $("#top-status").innerHTML = '<span class="txt">Miette injoignable</span>';
+        $("#side-status").className = "state bad";
+        $("#side-status").textContent = "Miette injoignable";
+        return null;
+      }
+      const level = !etat.prete ? "bad" : etat.papier_bas ? "warn" : "ok";
+      $("#top-status").className = "pill " + level;
+      $("#top-status").innerHTML = `<span class="txt">${esc(etat.imprimante.replace(/\.$/, ""))}</span>`;
+      $("#side-status").className = "state " + level;
+      $("#side-status").textContent = etat.prete && !etat.papier_bas ? "Imprimante prête" : etat.imprimante;
+      $("#side-remaining").textContent = `${etat.restantes} histoire${etat.restantes > 1 ? "s" : ""} encore possible${etat.restantes > 1 ? "s" : ""} aujourd'hui`;
+      return etat;
+    }
+    function statusPill() {
+      if (!etat) return "";
+      const level = !etat.prete ? "bad" : etat.papier_bas ? "warn" : "ok";
+      return `<div class="pill ${level}"><span class="txt">${esc(etat.prete && !etat.papier_bas ? "Imprimante prête" : etat.imprimante)}</span></div>`;
+    }
+
+    // Accueil
+
+    function childColor(id) {
+      const index = etat.enfants.findIndex((c) => c.id === id);
+      return COLORS[(index < 0 ? 0 : index) % COLORS.length];
+    }
+    function initial(name) { return esc((name || "?").trim().charAt(0).toUpperCase()); }
+    function namesOf(children) {
+      const names = children.map((c) => c.prenom);
+      return names.length <= 1 ? names.join("") : names.slice(0, -1).join(", ") + " et " + names.slice(-1);
+    }
+
+    function renderHome() {
+      const view = $("#view");
+      view.className = "";
+      if (!etat) { view.innerHTML = '<p class="empty">Chargement…</p>'; refreshState().then(() => etat && current() === "accueil" && renderHome()); return; }
+      const kids = etat.enfants;
+      let html = `<div class="greet"><div><div class="kicker">${esc(kicker())}</div><h1 class="big">Une histoire pour qui ?</h1></div>${statusPill()}</div>`;
+
+      if (!kids.length) {
+        html += `<div class="card" style="margin-top:18px"><h2 class="big" style="font-size:24px">Bienvenue</h2><p>Commence par créer une fiche pour chaque enfant : prénom, mois de naissance, doudou…</p><a class="btn dark" href="#/reglages">Créer les fiches</a></div>`;
+        view.innerHTML = html;
         return;
       }
-      $("#status").className = "pill " + (!state.prete ? "bad" : state.papier_bas ? "warn" : "ok");
-      $("#status").innerHTML = `<span>${escapeHtml(state.imprimante)}</span>`;
 
-      const hasChildren = state.enfants.length > 0;
-      $("#empty").hidden = hasChildren;
-      $("#who").hidden = !hasChildren;
-      $("#go").hidden = !hasChildren;
-      if (hasChildren) { renderChips(); renderOccasions(); }
+      html += kids.length > 1 ? `<div class="kids with-together" style="--n:${kids.length}">` : '<div class="kids">';
+      for (const child of kids) {
+        const color = childColor(child.id);
+        html += `<button class="kid" data-action="surprise" data-ids="${esc(child.id)}">
+          <span class="who"><span class="avatar" style="background:${color}">${initial(child.prenom)}</span>
+          <span class="name"><b>${esc(child.prenom)}</b><small>${esc(child.age || "")}</small></span></span>
+          <span class="surprise" style="background:${color}">${icon("sparkle", 16)}Surprise</span></button>`;
+      }
+      if (kids.length > 1) {
+        html += `<button class="kid together" data-action="surprise" data-ids="${esc(kids.map((c) => c.id).join(","))}">
+          <span class="who"><span class="avatars">${kids.slice(0, 3).map((c) => `<span class="avatar" style="background:${childColor(c.id)}">${initial(c.prenom)}</span>`).join("")}</span>
+          <span class="name"><b>${esc(namesOf(kids))}</b><small>Ensemble</small></span></span>
+          <span class="surprise">${icon("sparkle", 16)}Surprise</span></button>`;
+      }
+      html += "</div>";
 
-      const list = $("#history");
-      list.innerHTML = "";
-      state.histoires.forEach((h) => {
-        const li = document.createElement("li");
-        li.innerHTML = `<div><div class="t">${escapeHtml(h.titre)}</div><div class="d">${escapeHtml(h.pour)}, ${escapeHtml(when(h.date))}</div></div>`;
-        const b = document.createElement("button");
-        b.className = "ghost";
-        b.textContent = "Réimprimer";
-        b.disabled = busy;
-        b.addEventListener("click", () => printStory(h.id));
-        li.appendChild(b);
-        list.appendChild(li);
-      });
-      $("#past").hidden = state.histoires.length === 0;
+      html += '<section class="occasions"><h2 class="label">Une occasion</h2><div class="occ-row">';
+      for (const [key, label] of Object.entries(etat.occasions)) {
+        html += `<button class="occ" data-action="occasion" data-occasion="${esc(key)}" aria-pressed="${pendingOccasion === key}">${icon(key, 22, { color: OCC_COLORS[key] })}${esc(label)}</button>`;
+      }
+      html += "</div>";
+      if (pendingOccasion) {
+        html += `<div class="occ-pick"><span class="q">${esc(etat.occasions[pendingOccasion])} : pour qui ?</span>`;
+        for (const child of kids) html += `<button class="pick" style="background:${childColor(child.id)}" data-action="pick" data-ids="${esc(child.id)}">${esc(child.prenom)}</button>`;
+        if (kids.length > 1) html += `<button class="pick together" data-action="pick" data-ids="${esc(kids.map((c) => c.id).join(","))}">${esc(namesOf(kids))}</button>`;
+        html += "</div>";
+      }
+      html += "</section>";
 
-      const notes = [];
-      if (!state.cle) notes.push("Clé OpenRouter absente : aucune histoire ne peut être écrite.");
-      notes.push(`${state.restantes} histoire${state.restantes > 1 ? "s" : ""} encore possible${state.restantes > 1 ? "s" : ""} aujourd'hui.`);
-      $("#notice").textContent = notes.join(" ");
+      html += '<section class="home-bottom">';
+      if (etat.derniere) {
+        const s = etat.derniere;
+        html += `<div class="card last"><div class="head"><span class="label" style="margin:0">Dernière histoire</span><a href="#/historique">Tout l'historique</a></div>
+          <div class="meta">${esc(metaLine(s))}</div><h2>${esc(s.titre)}</h2><div class="excerpt">${esc(s.texte.replace(/\n\s*\n/g, " "))}</div>
+          <div class="row-actions"><a class="btn" href="#/histoire/${esc(s.id)}">${icon("book", 18)}Relire</a>
+          <button class="btn dark" data-action="reprint" data-id="${esc(s.id)}">${icon("printer", 18)}Réimprimer</button></div></div>`;
+      } else {
+        html += `<div class="card last"><span class="label">Dernière histoire</span><p class="empty" style="margin:0">Aucune histoire imprimée pour l'instant : choisis un enfant ci-dessus.</p></div>`;
+      }
+      html += `<div class="card favs"><div class="head"><span class="label" style="margin:0">Favoris</span><a href="#/historique">Historique</a></div>`;
+      html += etat.favoris.length
+        ? etat.favoris.map((f) => `<a class="fav-link" href="#/histoire/${esc(f.id)}"><b>${esc(f.titre)}</b><small>${esc([f.pour, f.occasion ? etat.occasions[f.occasion] : ""].filter(Boolean).join(" · "))}</small></a>`).join("")
+        : '<p class="empty" style="margin:0">Touche l\'étoile d\'une histoire pour la retrouver ici.</p>';
+      html += "</div></section>";
+
+      if (!etat.cle) html += '<p class="notice">Clé OpenRouter absente : aucune histoire ne peut être écrite.</p>';
+      view.innerHTML = html;
+    }
+
+    // Aperçu
+
+    function renderPreview() {
+      const view = $("#view");
+      view.className = "";
+      if (!draft) { location.hash = "#/"; return; }
+      const occasion = draft.occasion && etat ? etat.occasions[draft.occasion] : null;
+      view.innerHTML = `<div class="view-head"><div class="titles"><a class="round" href="#/" aria-label="Retour à l'accueil">${icon("back", 20)}</a>
+          <div><b>Aperçu</b><small>Rien n'est encore imprimé</small></div></div></div>
+        <article class="sheet"><div class="chips"><span class="chip accent">Pour ${esc(draft.pour)}</span>
+          <span class="chip">${occasion ? icon(draft.occasion, 14) + esc(occasion) : icon("sparkle", 14) + "Surprise"}</span></div>
+          <h1 class="story-title">${esc(draft.titre)}</h1><div class="story">${paragraphs(draft.texte)}</div></article>
+        <div class="actionbar" style="max-width:760px"><button class="btn big-btn" data-action="another">${icon("again", 18)}Une autre</button>
+          <button class="btn big-btn primary grow" data-action="print-draft" data-id="${esc(draft.id)}">${icon("printer", 20)}Imprimer</button></div>`;
+    }
+
+    // Historique et lecture
+
+    async function loadHistory() {
+      historyItems = await api("GET", "/api/histoires" + (historyFilter === "favoris" ? "?favoris=true" : ""));
+      return historyItems;
+    }
+    function listHtml(items, selectedId) {
+      if (!items.length) {
+        return `<div class="card" style="margin-top:12px"><p class="empty" style="margin:0">${historyFilter === "favoris" ? "Aucun favori : touche l'étoile d'une histoire pour la retrouver ici." : "Aucune histoire imprimée pour l'instant."}</p></div>`;
+      }
+      const recent = [], older = [];
+      for (const item of items) (Date.now() - new Date(item.imprimee) < 7 * 86400000 ? recent : older).push(item);
+      const group = (title, list) => !list.length ? "" : `<div class="group-label">${title}</div><div class="list">${list.map((item) => `
+        <div class="item${item.id === selectedId ? " selected" : ""}"><a href="#/histoire/${esc(item.id)}"${item.id === selectedId ? ' aria-current="true"' : ""}><b>${esc(item.titre)}</b><small>${esc(metaLine(item))}</small></a>
+        <button class="star" data-action="fav" data-id="${esc(item.id)}" aria-pressed="${item.favori}" aria-label="${item.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: item.favori })}</button></div>`).join("")}</div>`;
+      return group("Cette semaine", recent) + group("Plus tôt", older);
+    }
+    function listPane(items, selectedId) {
+      return `<div class="hist-head"><h1 class="big">Historique</h1><span class="count">${items.length} histoire${items.length > 1 ? "s" : ""}</span></div>
+        <div class="seg" role="group" aria-label="Filtre"><button data-action="filter" data-filter="toutes" aria-pressed="${historyFilter === "toutes"}">Toutes</button>
+        <button data-action="filter" data-filter="favoris" aria-pressed="${historyFilter === "favoris"}">${icon("star", 16)}Favoris</button></div>${listHtml(items, selectedId)}`;
+    }
+    function readerTools(story, round) {
+      const cls = round ? "round star" : "btn icon-only star";
+      return `<button class="${cls}" data-action="fav" data-id="${esc(story.id)}" aria-pressed="${story.favori}" aria-label="${story.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: story.favori })}</button>`;
+    }
+
+    async function renderHistory(selectedId) {
+      const view = $("#view");
+      if (!historyItems) {
+        view.innerHTML = '<p class="empty">Chargement…</p>';
+        try { await loadHistory(); } catch (error) { view.innerHTML = `<p class="empty">${esc(error.message)}</p>`; return; }
+      }
+      const items = historyItems;
+      if (!wide.matches) {
+        view.className = "";
+        view.innerHTML = listPane(items, null);
+        return;
+      }
+      const selected = items.find((i) => i.id === selectedId) || (selectedId ? await api("GET", `/api/histoires/${selectedId}`).catch(() => null) : null) || items[0];
+      view.className = "wide-history";
+      view.innerHTML = `<div class="hist-layout"><section class="hist-list">${listPane(items, selected && selected.id)}</section>
+        <article class="hist-reader">${selected ? `<div class="top"><div><div class="reader-meta">${esc(selected.pour)} · ${esc(longDate(selected.imprimee || selected.date))}${selected.occasion ? " · " + esc(etat.occasions[selected.occasion]) : ""}</div>
+          <h2 class="story-title">${esc(selected.titre)}</h2></div><div class="tools">${readerTools(selected, false)}
+          <button class="btn icon-only danger" data-action="delete" data-id="${esc(selected.id)}" aria-label="Supprimer l'histoire">${icon("trash", 20)}</button>
+          <button class="btn dark" data-action="reprint" data-id="${esc(selected.id)}">${icon("printer", 18)}Réimprimer</button></div></div>
+          <div class="story">${paragraphs(selected.texte)}</div>` : '<p class="empty">Choisis une histoire à gauche.</p>'}</article></div>`;
+    }
+
+    async function renderStory(id) {
+      const view = $("#view");
+      view.className = "";
+      let story = historyItems && historyItems.find((i) => i.id === id);
+      if (!story) {
+        view.innerHTML = '<p class="empty">Chargement…</p>';
+        try { story = await api("GET", `/api/histoires/${id}`); } catch (error) { view.innerHTML = `<p class="empty">${esc(error.message)}</p><a class="btn" href="#/historique">Historique</a>`; return; }
+      }
+      view.innerHTML = `<div class="view-head"><a class="back" href="#/historique">${icon("back", 20)}Historique</a>${readerTools(story, true)}</div>
+        <article class="reader"><div class="reader-meta">${esc(story.pour)} · ${esc(longDate(story.imprimee || story.date))}${story.occasion ? " · " + esc(etat.occasions[story.occasion]) : ""}</div>
+        <h1 class="story-title">${esc(story.titre)}</h1><div class="story">${paragraphs(story.texte)}</div></article>
+        <div class="actionbar" style="max-width:700px"><button class="btn big-btn danger" data-action="delete" data-id="${esc(story.id)}">${icon("trash", 18)}Supprimer</button>
+        <button class="btn big-btn dark grow" data-action="reprint" data-id="${esc(story.id)}">${icon("printer", 20)}Réimprimer</button></div>`;
     }
 
     // Réglages
 
-    let drafts = [];
+    const FIELDS = [["doudou", "Doudou", "Nom et forme du doudou"], ["animaux", "Animaux de la maison", "Le chat, les poules…"]];
+    const PAIRS = [["creche", "Crèche", ""], ["nounou", "Nounou", ""]];
 
-    function childForm(child, index) {
-      const card = document.createElement("div");
-      card.className = "card child-card";
-      const title = escapeHtml(child.prenom || "Nouvel enfant");
-      card.innerHTML = `<div class="top"><strong>${title}</strong><button class="ghost" data-remove>Retirer</button></div>`;
-      FIELDS.forEach(([key, label, placeholder]) => {
-        const field = document.createElement("label");
-        field.className = "field";
-        const type = key === "naissance" ? "month" : "text";
-        field.innerHTML = `<span>${label}</span><input type="${type}" data-key="${key}" placeholder="${escapeHtml(placeholder)}" autocomplete="off">`;
-        field.querySelector("input").value = child[key] || "";
-        field.querySelector("input").addEventListener("input", (event) => { drafts[index][key] = event.target.value; });
-        card.appendChild(field);
-        if (key === "naissance") {
-          const label = document.createElement("div");
-          label.className = "field";
-          label.innerHTML = "<span>Accord</span>";
-          card.appendChild(label);
-          const seg = document.createElement("div");
-          seg.className = "seg";
-          ["elle", "il"].forEach((value) => {
-            const b = document.createElement("button");
-            b.type = "button";
-            b.textContent = value;
-            b.setAttribute("aria-pressed", String((child.accord || "elle") === value));
-            b.addEventListener("click", () => {
-              drafts[index].accord = value;
-              seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-            });
-            seg.appendChild(b);
-          });
-          card.appendChild(seg);
-        }
-      });
-      card.querySelector("[data-remove]").addEventListener("click", () => {
-        drafts.splice(index, 1);
-        renderForms();
-      });
-      return card;
+    function input(index, key, label, placeholder, type = "text") {
+      const value = settingsDrafts[index][key] || "";
+      return `<label class="field">${label}<input type="${type}" data-field="${key}" data-index="${index}" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off"></label>`;
+    }
+    function renderSettingsForms() {
+      const cards = settingsDrafts.map((child, index) => {
+        const color = COLORS[index % COLORS.length];
+        const accord = child.accord || "elle";
+        return `<form class="card fiche" onsubmit="return false">
+          <div class="top"><div class="who"><span class="avatar" style="background:${color}">${initial(child.prenom)}</span><b>${esc(child.prenom || "Nouvel enfant")}</b></div>
+          <button type="button" class="btn danger" data-action="remove-child" data-index="${index}">Retirer</button></div>
+          <div class="pair">${input(index, "prenom", "Prénom", "Prénom")}${input(index, "naissance", "Mois de naissance", "", "month")}</div>
+          <div class="seg" role="group" aria-label="Accord" style="margin:0">
+            <button type="button" data-action="accord" data-index="${index}" data-value="elle" aria-pressed="${accord === "elle"}">elle</button>
+            <button type="button" data-action="accord" data-index="${index}" data-value="il" aria-pressed="${accord === "il"}">il</button></div>
+          ${FIELDS.map(([k, l, p]) => input(index, k, l, p)).join("")}
+          <div class="pair">${PAIRS.map(([k, l, p]) => input(index, k, l, p)).join("")}</div>
+          ${input(index, "copains", "Copains", "Prénoms des copains")}</form>`;
+      }).join("");
+      const add = settingsDrafts.length < 6 ? `<button class="add-card" data-action="add-child">${icon("plus", 28)}Ajouter un enfant</button>` : "";
+      $("#fiches").innerHTML = cards + add;
+    }
+    async function renderSettings() {
+      const view = $("#view");
+      view.className = "";
+      view.innerHTML = `<div class="settings-head"><div><h1 class="big">Les enfants</h1>
+        <p class="privacy">Ces fiches restent sur le serveur de la maison. Les détails se glissent dans les histoires, et partent avec chaque demande vers le modèle qui écrit.</p></div>
+        <button class="btn dark big-btn" data-action="save">Enregistrer</button></div><div class="fiches" id="fiches"><p class="empty">Chargement…</p></div>`;
+      try { settingsDrafts = await api("GET", "/api/enfants"); } catch (error) { toast(error.message, true); settingsDrafts = []; }
+      if (!settingsDrafts.length) settingsDrafts = [{ accord: "elle" }];
+      renderSettingsForms();
     }
 
-    function renderForms() {
-      const box = $("#children-forms");
-      box.innerHTML = "";
-      drafts.forEach((child, index) => box.appendChild(childForm(child, index)));
-      $("#add-child").hidden = drafts.length >= 6;
-    }
+    // Actions
 
-    async function openSettings() {
-      $("#settings-notice").textContent = "";
+    async function write(request) {
+      if (busy) return;
+      setBusy(true, "Miette écrit l'histoire…");
       try {
-        drafts = await api("GET", "/api/enfants");
+        draft = await api("POST", "/api/histoires", request);
+        lastRequest = request;
+        session.set("miette.apercu", draft);
+        session.set("miette.demande", request);
+        pendingOccasion = null;
+        if (location.hash === "#/apercu") renderPreview(); else location.hash = "#/apercu";
       } catch (error) {
-        drafts = [];
-        $("#settings-notice").textContent = error.message;
+        toast(error.message, true);
+      } finally {
+        setBusy(false);
+        refreshState();
       }
-      if (!drafts.length) drafts = [{ accord: "elle" }];
-      renderForms();
     }
 
-    $("#add-child").addEventListener("click", () => { drafts.push({ accord: "elle" }); renderForms(); });
-    $("#save").addEventListener("click", async () => {
-      const cleaned = drafts
+    async function print(id, fromDraft) {
+      if (busy) return;
+      setBusy(true, "Impression…");
+      try {
+        const story = await api("POST", `/api/histoires/${id}/imprimer`);
+        toast(fromDraft ? "Imprimée" : "Réimprimée");
+        historyItems = null;
+        await refreshState();
+        if (fromDraft) {
+          draft = null;
+          session.set("miette.apercu", null);
+          location.hash = `#/histoire/${story.id}`;
+        } else {
+          route(false);
+        }
+      } catch (error) {
+        toast(error.message, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function toggleFavorite(id, button) {
+      const next = button.getAttribute("aria-pressed") !== "true";
+      try {
+        const story = await api("POST", `/api/histoires/${id}/favori`, { favori: next });
+        if (historyItems) {
+          const index = historyItems.findIndex((i) => i.id === id);
+          if (index >= 0) historyItems[index] = story;
+          if (historyFilter === "favoris" && !next) historyItems = historyItems.filter((i) => i.id !== id);
+        }
+        toast(next ? "Ajoutée aux favoris" : "Retirée des favoris");
+        refreshState();
+        route(false);
+      } catch (error) {
+        toast(error.message, true);
+      }
+    }
+
+    async function remove(id) {
+      const story = (historyItems || []).find((i) => i.id === id);
+      if (!confirm(`Supprimer « ${story ? story.titre : "cette histoire"} » ? Elle disparaîtra de l'historique.`)) return;
+      try {
+        await api("DELETE", `/api/histoires/${id}`);
+        toast("Supprimée");
+        historyItems = null;
+        await refreshState();
+        if (location.hash === "#/historique") route(false); else location.hash = "#/historique";
+      } catch (error) {
+        toast(error.message, true);
+      }
+    }
+
+    async function saveSettings() {
+      const cleaned = settingsDrafts
         .map((c) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v])))
         .filter((c) => c.prenom);
       try {
         await api("PUT", "/api/enfants", cleaned);
-        location.hash = "";
+        toast("Fiches enregistrées");
+        await refreshState();
+        location.hash = "#/";
       } catch (error) {
-        $("#settings-notice").textContent = error.message;
+        toast(error.message, true);
       }
+    }
+
+    document.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-action]");
+      if (!target || busy) return;
+      const { action, id, ids, index } = target.dataset;
+      if (action === "surprise") write({ enfants: ids.split(","), occasion: null });
+      else if (action === "occasion") {
+        const key = target.dataset.occasion;
+        if (etat.enfants.length === 1) { write({ enfants: [etat.enfants[0].id], occasion: key }); return; }
+        pendingOccasion = pendingOccasion === key ? null : key;
+        renderHome();
+      }
+      else if (action === "pick") write({ enfants: ids.split(","), occasion: pendingOccasion });
+      else if (action === "another") { if (lastRequest) write(lastRequest); }
+      else if (action === "print-draft") print(id, true);
+      else if (action === "reprint") print(id, false);
+      else if (action === "fav") toggleFavorite(id, target);
+      else if (action === "delete") remove(id);
+      else if (action === "filter") { historyFilter = target.dataset.filter; historyItems = null; route(false); }
+      else if (action === "add-child") { settingsDrafts.push({ accord: "elle" }); renderSettingsForms(); }
+      else if (action === "remove-child") { settingsDrafts.splice(Number(index), 1); renderSettingsForms(); }
+      else if (action === "accord") { settingsDrafts[Number(index)].accord = target.dataset.value; renderSettingsForms(); }
+      else if (action === "save") saveSettings();
+    });
+    document.addEventListener("input", (event) => {
+      const el = event.target;
+      if (el.dataset && el.dataset.field) settingsDrafts[Number(el.dataset.index)][el.dataset.field] = el.value;
     });
 
     // Navigation
 
-    function route() {
-      const settings = location.hash === "#reglages";
-      $("#view-main").hidden = settings;
-      $("#view-settings").hidden = !settings;
-      window.scrollTo(0, 0);
-      if (settings) openSettings(); else refresh();
+    function parse() {
+      const match = (location.hash || "#/").match(/^#\/([^/]*)\/?(.*)$/) || [];
+      return { view: match[1] || "", id: decodeURIComponent(match[2] || "") };
     }
-    window.addEventListener("hashchange", route);
-    route();
-    setInterval(() => { if (!busy && !document.hidden && location.hash !== "#reglages") refresh(); }, 20000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden && location.hash !== "#reglages") refresh(); });
+    function current() {
+      const { view } = parse();
+      return view === "" ? "accueil" : view === "histoire" ? "historique" : view;
+    }
+    function route(scroll = true) {
+      const { view, id } = parse();
+      document.body.classList.toggle("focus", view === "apercu" || view === "histoire");
+      const section = current();
+      document.querySelectorAll("[data-nav]").forEach((a) => {
+        if (a.dataset.nav === section) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+      });
+      if (view !== "") pendingOccasion = null;
+      if (view === "") renderHome();
+      else if (view === "apercu") renderPreview();
+      else if (view === "historique") renderHistory(null);
+      else if (view === "histoire") (wide.matches ? renderHistory(id) : renderStory(id));
+      else if (view === "reglages") renderSettings();
+      else { location.hash = "#/"; return; }
+      if (scroll) window.scrollTo(0, 0);
+    }
+
+    window.addEventListener("hashchange", () => route(true));
+    wide.addEventListener("change", () => route(false));
+    refreshState().then(() => route(true));
+    setInterval(() => { if (!busy && !document.hidden) refreshState().then(() => { if (current() === "accueil" && !pendingOccasion) renderHome(); }); }, 30000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshState(); });
   </script>
 </body>
 </html>
