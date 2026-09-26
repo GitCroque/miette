@@ -151,18 +151,24 @@
       display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-height: 132px; padding: 14px; text-align: left;
       border-radius: var(--r); background: var(--card); border: 1px solid var(--line); color: var(--ink);
     }
-    .kid .who { display: flex; align-items: center; gap: 10px; }
-    .kid .name { display: flex; flex-direction: column; }
+    .kid .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .kid .name { display: flex; flex-direction: column; min-width: 0; }
     .kid .name b { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 21px; line-height: 1.1; }
-    .kid .name small { font-size: 13px; color: var(--soft); font-weight: 700; }
+    .kid .name small { font-size: 13px; color: var(--soft); font-weight: 700; white-space: nowrap; }
     .kid.together { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 72px; background: var(--inverse-bg); color: var(--inverse-ink); border-color: transparent; }
     .kid.together .name small { color: var(--inverse-soft); }
     .kid.together .name b { font-size: 19px; }
+    /* Très petits écrans (320 px) : la carte « ensemble » repasse en colonne. */
+    @media (max-width: 379px) {
+      .kid.together { flex-direction: column; align-items: stretch; }
+      .actionbar .btn.danger .lbl { display: none; }
+      .actionbar .btn.danger { padding: 0 16px; }
+    }
     .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #FFFFFF; font-family: Fredoka, sans-serif; font-weight: 600; font-size: 20px; }
     .avatars { display: flex; }
     .avatars .avatar { border: 2px solid var(--inverse-bg); }
     .avatars .avatar + .avatar { margin-left: -10px; }
-    .surprise { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; color: #FFFFFF; font-weight: 800; font-size: 15px; }
+    .surprise { flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; color: #FFFFFF; font-weight: 800; font-size: 15px; white-space: nowrap; }
     .kid.together .surprise { background: var(--inverse-ink); color: var(--inverse-bg); }
     @media (min-width: 700px) {
       .kids { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -173,14 +179,12 @@
       .avatars .avatar + .avatar { margin-left: -16px; }
       .kid .who { flex-direction: column; align-items: flex-start; gap: 34px; }
     }
+    /* Sur ordinateur, les cartes restent en colonne : en ligne, prénom, âge et bouton
+       débordaient dès que l'écran était plus étroit que 1440 px (constaté le 2026-09-26). */
     @media (min-width: 1100px) {
-      /* La carte « ensemble » porte plusieurs prénoms : une colonne plus large. */
-      .kids.with-together { grid-template-columns: repeat(var(--n), minmax(0, 1fr)) minmax(0, 1.4fr); }
-      .kid, .kid.together { flex-direction: row; align-items: center; min-height: 116px; padding: 0 22px; border-radius: 24px; }
-      .kid.together .name b { font-size: 22px; }
+      .kid, .kid.together { min-height: 156px; padding: 20px; border-radius: 24px; }
       .kid .who { flex-direction: row; align-items: center; gap: 14px; }
-      .kid .name b { font-size: 24px; }
-      .kid .surprise { align-self: center; padding: 10px 14px; }
+      .kid .name b, .kid.together .name b { font-size: 24px; }
     }
 
     .occasions { margin-top: 22px; }
@@ -195,20 +199,23 @@
     @media (min-width: 700px) {
       .occ-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; overflow: visible; }
       .occ { flex-direction: column; align-items: flex-start; justify-content: space-between; height: 104px; padding: 16px; border-radius: 20px; font-size: 16px; font-weight: 800; text-align: left; }
+      .occ svg { width: 28px; height: 28px; }
     }
     @media (min-width: 1100px) {
       .occ-row { display: flex; }
       .occ { flex-direction: row; align-items: center; height: 50px; padding: 0 18px; border-radius: 16px; }
+      .occ svg { width: 22px; height: 22px; }
     }
 
-    .home-bottom { display: grid; gap: 12px; margin-top: 22px; }
+    .home-bottom { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 22px; }
     .home-bottom .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
-    .home-bottom .head a { font-size: 14px; font-weight: 800; text-decoration: none; }
+    .home-bottom .head a { font-size: 14px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+    .home-bottom .head .label { white-space: nowrap; }
     .last .meta { font-size: 13px; color: var(--soft); font-weight: 700; }
     .last h2 { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 21px; line-height: 1.2; margin: 3px 0 6px; }
     .excerpt { font-family: Gelasio, Georgia, serif; font-size: 16px; line-height: 1.5; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .row-actions { display: flex; gap: 8px; margin-top: 14px; }
-    .row-actions .btn { flex: 1; }
+    .row-actions .btn { flex: 1; min-width: 0; }
     .favs { display: none; }
     .fav-link { display: flex; flex-direction: column; gap: 2px; padding: 12px 0; border-bottom: 1px solid var(--paper-2); color: var(--ink); text-decoration: none; }
     .fav-link:last-child { border-bottom: 0; }
@@ -257,10 +264,11 @@
     .hist-layout { display: block; }
     @media (min-width: 1100px) {
       main.wide-history { max-width: none; padding: 0; }
-      .hist-layout { display: grid; grid-template-columns: 420px minmax(0, 1fr); min-height: 100vh; }
+      .hist-layout { display: grid; grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); min-height: 100vh; }
       .hist-list { padding: 36px 24px 36px 32px; border-right: 1px solid var(--line); overflow-y: auto; max-height: 100vh; position: sticky; top: 0; }
-      .hist-reader { padding: 40px 56px; }
-      .hist-reader .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+      .hist-reader { padding: 40px clamp(32px, 4vw, 56px); min-width: 0; }
+      .hist-reader .top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
+      .hist-reader .top > div:first-child { flex: 1 1 320px; min-width: 0; }
       .hist-reader .tools { display: flex; gap: 8px; flex: none; }
       .hist-reader .story-title { font-size: 38px; }
       .hist-reader .story { font-size: 21px; max-width: 640px; }
@@ -394,7 +402,7 @@
       try { data = await response.json(); } catch {}
       if (!response.ok) {
         const detail = data && data.detail;
-        const message = Array.isArray(detail) ? "Champ invalide : " + ((detail[0] && detail[0].loc) || []).slice(-1)[0] : detail;
+        const message = Array.isArray(detail) ? "Champ invalide : " + ((detail[0] && detail[0].loc) || []).slice(-1)[0] : detail;
         throw new Error(message || `Erreur ${response.status}`);
       }
       return data;
@@ -436,7 +444,9 @@
     function metaLine(story) {
       return [story.pour, story.occasion && etat ? etat.occasions[story.occasion] : "", whenLabel(story.imprimee || story.date)].filter(Boolean).join(" · ");
     }
-    function paragraphs(text) { return text.split(/\n\s*\n/).map((p) => `<p>${esc(p)}</p>`).join(""); }
+    // Typographie française, comme sur le ticket : « ! » ou « » » ne commencent jamais une ligne.
+    function typeset(text) { return text.replace(/ ([!?:;»])/g, "\u00a0$1").replace(/« /g, "«\u00a0"); }
+    function paragraphs(text) { return text.split(/\n\s*\n/).map((p) => `<p>${esc(typeset(p))}</p>`).join(""); }
 
     // État de l'imprimante, dans la barre du haut ou la barre latérale
 
@@ -481,15 +491,15 @@
       view.className = "";
       if (!etat) { view.innerHTML = '<p class="empty">Chargement…</p>'; refreshState().then(() => etat && current() === "accueil" && renderHome()); return; }
       const kids = etat.enfants;
-      let html = `<div class="greet"><div><div class="kicker">${esc(kicker())}</div><h1 class="big">Une histoire pour qui ?</h1></div>${statusPill()}</div>`;
+      let html = `<div class="greet"><div><div class="kicker">${esc(kicker())}</div><h1 class="big">Une histoire pour qui&nbsp;?</h1></div>${statusPill()}</div>`;
 
       if (!kids.length) {
-        html += `<div class="card" style="margin-top:18px"><h2 class="big" style="font-size:24px">Bienvenue</h2><p>Commence par créer une fiche pour chaque enfant : prénom, mois de naissance, doudou…</p><a class="btn dark" href="#/reglages">Créer les fiches</a></div>`;
+        html += `<div class="card" style="margin-top:18px"><h2 class="big" style="font-size:24px">Bienvenue</h2><p>Commence par créer une fiche pour chaque enfant : prénom, mois de naissance, doudou…</p><a class="btn dark" href="#/reglages">Créer les fiches</a></div>`;
         view.innerHTML = html;
         return;
       }
 
-      html += kids.length > 1 ? `<div class="kids with-together" style="--n:${kids.length}">` : '<div class="kids">';
+      html += '<div class="kids">';
       for (const child of kids) {
         const color = childColor(child.id);
         html += `<button class="kid" data-action="surprise" data-ids="${esc(child.id)}">
@@ -511,7 +521,7 @@
       }
       html += "</div>";
       if (pendingOccasion) {
-        html += `<div class="occ-pick"><span class="q">${esc(etat.occasions[pendingOccasion])} : pour qui ?</span>`;
+        html += `<div class="occ-pick"><span class="q">${esc(etat.occasions[pendingOccasion])} : pour qui ?</span>`;
         for (const child of kids) html += `<button class="pick" style="background:${childColor(child.id)}" data-action="pick" data-ids="${esc(child.id)}">${esc(child.prenom)}</button>`;
         if (kids.length > 1) html += `<button class="pick together" data-action="pick" data-ids="${esc(kids.map((c) => c.id).join(","))}">${esc(namesOf(kids))}</button>`;
         html += "</div>";
@@ -522,11 +532,11 @@
       if (etat.derniere) {
         const s = etat.derniere;
         html += `<div class="card last"><div class="head"><span class="label" style="margin:0">Dernière histoire</span><a href="#/historique">Tout l'historique</a></div>
-          <div class="meta">${esc(metaLine(s))}</div><h2>${esc(s.titre)}</h2><div class="excerpt">${esc(s.texte.replace(/\n\s*\n/g, " "))}</div>
+          <div class="meta">${esc(metaLine(s))}</div><h2>${esc(s.titre)}</h2><div class="excerpt">${esc(typeset(s.texte.replace(/\n\s*\n/g, " ")))}</div>
           <div class="row-actions"><a class="btn" href="#/histoire/${esc(s.id)}">${icon("book", 18)}Relire</a>
           <button class="btn dark" data-action="reprint" data-id="${esc(s.id)}">${icon("printer", 18)}Réimprimer</button></div></div>`;
       } else {
-        html += `<div class="card last"><span class="label">Dernière histoire</span><p class="empty" style="margin:0">Aucune histoire imprimée pour l'instant : choisis un enfant ci-dessus.</p></div>`;
+        html += `<div class="card last"><span class="label">Dernière histoire</span><p class="empty" style="margin:0">Aucune histoire imprimée pour l'instant : choisis un enfant ci-dessus.</p></div>`;
       }
       html += `<div class="card favs"><div class="head"><span class="label" style="margin:0">Favoris</span><a href="#/historique">Historique</a></div>`;
       html += etat.favoris.length
@@ -534,7 +544,7 @@
         : '<p class="empty" style="margin:0">Touche l\'étoile d\'une histoire pour la retrouver ici.</p>';
       html += "</div></section>";
 
-      if (!etat.cle) html += '<p class="notice">Clé OpenRouter absente : aucune histoire ne peut être écrite.</p>';
+      if (!etat.cle) html += '<p class="notice">Clé OpenRouter absente : aucune histoire ne peut être écrite.</p>';
       view.innerHTML = html;
     }
 
@@ -562,7 +572,7 @@
     }
     function listHtml(items, selectedId) {
       if (!items.length) {
-        return `<div class="card" style="margin-top:12px"><p class="empty" style="margin:0">${historyFilter === "favoris" ? "Aucun favori : touche l'étoile d'une histoire pour la retrouver ici." : "Aucune histoire imprimée pour l'instant."}</p></div>`;
+        return `<div class="card" style="margin-top:12px"><p class="empty" style="margin:0">${historyFilter === "favoris" ? "Aucun favori : touche l'étoile d'une histoire pour la retrouver ici." : "Aucune histoire imprimée pour l'instant."}</p></div>`;
       }
       const recent = [], older = [];
       for (const item of items) (Date.now() - new Date(item.imprimee) < 7 * 86400000 ? recent : older).push(item);
@@ -614,7 +624,7 @@
       view.innerHTML = `<div class="view-head"><a class="back" href="#/historique">${icon("back", 20)}Historique</a>${readerTools(story, true)}</div>
         <article class="reader"><div class="reader-meta">${esc(story.pour)} · ${esc(longDate(story.imprimee || story.date))}${story.occasion ? " · " + esc(etat.occasions[story.occasion]) : ""}</div>
         <h1 class="story-title">${esc(story.titre)}</h1><div class="story">${paragraphs(story.texte)}</div></article>
-        <div class="actionbar" style="max-width:700px"><button class="btn big-btn danger" data-action="delete" data-id="${esc(story.id)}">${icon("trash", 18)}Supprimer</button>
+        <div class="actionbar" style="max-width:700px"><button class="btn big-btn danger" data-action="delete" data-id="${esc(story.id)}" aria-label="Supprimer l'histoire">${icon("trash", 18)}<span class="lbl">Supprimer</span></button>
         <button class="btn big-btn dark grow" data-action="reprint" data-id="${esc(story.id)}">${icon("printer", 20)}Réimprimer</button></div>`;
     }
 
@@ -717,7 +727,7 @@
 
     async function remove(id) {
       const story = (historyItems || []).find((i) => i.id === id);
-      if (!confirm(`Supprimer « ${story ? story.titre : "cette histoire"} » ? Elle disparaîtra de l'historique.`)) return;
+      if (!confirm(`Supprimer « ${story ? story.titre : "cette histoire"} » ? Elle disparaîtra de l'historique.`)) return;
       try {
         await api("DELETE", `/api/histoires/${id}`);
         toast("Supprimée");
