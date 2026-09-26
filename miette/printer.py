@@ -1,12 +1,16 @@
 """Dialogue avec l'imprimante thermique sur TCP 9100.
 
-L'état est lu avant chaque impression par les commandes temps réel
-`DLE EOT n` : on ne paie pas une histoire qui ne pourra pas sortir.
+L'état est lu par les commandes temps réel `DLE EOT n`.
+
+La TM-T88VI n'accepte qu'une connexion à la fois sur le port 9100 (vérifié le
+2026-09-26) : une seconde connexion attend jusqu'à l'expiration, et un refus
+la laisse muette quelques secondes. Tous les accès passent donc par un verrou.
 """
 
 from __future__ import annotations
 
 import socket
+import threading
 from dataclasses import dataclass
 
 from escpos.exceptions import Error as EscposError
@@ -16,6 +20,8 @@ from PIL import Image
 # python-escpos n'a pas de profil TM-T88VI. Celui de la TM-T88V a les mêmes
 # valeurs, vérifiées sur la machine : 180 dpi, 512 points, 42 colonnes.
 PROFILE = "TM-T88V"
+
+_device = threading.Lock()
 
 
 class PrinterError(Exception):
@@ -60,7 +66,7 @@ def status(host: str, port: int = 9100, timeout: float = 3.0) -> Status:
         return Status(False, "Adresse de l'imprimante absente (MIETTE_IMPRIMANTE).")
     answers = []
     try:
-        with socket.create_connection((host, port), timeout=timeout) as sock:
+        with _device, socket.create_connection((host, port), timeout=timeout) as sock:
             sock.settimeout(timeout)
             for n in (1, 2, 3, 4):
                 sock.sendall(bytes([0x10, 0x04, n]))
@@ -79,9 +85,10 @@ def connect(host: str, port: int = 9100) -> Network:
 
 def print_image(host: str, port: int, image: Image.Image) -> None:
     try:
-        printer = connect(host, port)
-        printer.image(image, impl="bitImageRaster", center=False)
-        printer.cut()
-        printer.close()
+        with _device:
+            printer = connect(host, port)
+            printer.image(image, impl="bitImageRaster", center=False)
+            printer.cut()
+            printer.close()
     except (OSError, EscposError) as exc:
         raise PrinterError("L'impression a échoué en cours de route.") from exc

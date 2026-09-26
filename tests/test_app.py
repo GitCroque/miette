@@ -104,3 +104,19 @@ def test_printer_problem_is_reported(client, monkeypatch):
     response = client.post(f"/api/histoires/{story_id}/imprimer")
     assert response.status_code == 503 and response.json()["detail"] == "Plus de papier."
     assert client.get("/api/etat").json()["histoires"] == []
+
+
+def test_printer_state_is_cached_between_pages(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(printer, "status", lambda host, port: calls.append(1) or printer.Status(True, "Prête."))
+    for _ in range(3):
+        client.get("/api/etat")
+    assert len(calls) == 1
+
+
+def test_printing_always_checks_the_printer_again(client, monkeypatch):
+    lou, = _children(client, LOU)
+    client.get("/api/etat")
+    story_id = client.post("/api/histoires", json={"enfants": [lou]}).json()["id"]
+    monkeypatch.setattr(printer, "status", lambda host, port: printer.Status(False, "Le capot est ouvert."))
+    assert client.post(f"/api/histoires/{story_id}/imprimer").json()["detail"] == "Le capot est ouvert."

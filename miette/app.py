@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import date
 from pathlib import Path
 from typing import Literal
@@ -29,6 +30,26 @@ store = Store(settings.data_dir)
 # Une seule impression à la fois : deux appuis rapprochés ne doivent pas
 # entremêler deux tickets.
 printing = threading.Lock()
+
+# Chaque page ouverte demande l'état toutes les 30 secondes, et l'imprimante
+# ne sert qu'une connexion à la fois : l'état affiché est gardé 5 secondes, et
+# pendant une impression on rend le dernier connu sans ouvrir de connexion.
+STATUS_MAX_AGE = 5.0
+_status_lock = threading.Lock()
+_status_cache: dict = {"at": 0.0, "value": None}
+
+
+def printer_status(fresh: bool = False) -> printer.Status:
+    with _status_lock:
+        cached = _status_cache["value"]
+        if not fresh:
+            if cached is not None and time.monotonic() - _status_cache["at"] < STATUS_MAX_AGE:
+                return cached
+            if printing.locked():
+                return cached or printer.Status(True, "Impression en cours.")
+        value = printer.status(settings.printer_host, settings.printer_port)
+        _status_cache.update(at=time.monotonic(), value=value)
+        return value
 
 app = FastAPI(title="Miette", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -94,7 +115,7 @@ def healthz() -> dict:
 
 @app.get("/api/etat")
 def state() -> dict:
-    status = printer.status(settings.printer_host, settings.printer_port)
+    status = printer_status()
     return {
         "imprimante": status.message,
         "prete": status.ready,
@@ -151,7 +172,7 @@ def print_story(story_id: str) -> dict:
     if not printing.acquire(blocking=False):
         raise HTTPException(409, "Un ticket est déjà en cours d'impression.")
     try:
-        status = printer.status(settings.printer_host, settings.printer_port)
+        status = printer_status(fresh=True)
         if not status.ready:
             raise HTTPException(503, status.message)
         image = ticket.render_raster(entry.title, tuple(entry.paragraphs),
