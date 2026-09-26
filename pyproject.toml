@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "miette"
+version = "0.1.0"
+description = "Histoires et jeux imprimés sur une imprimante thermique de caisse, pour les 3 à 5 ans."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "python-escpos>=3.1,<4",
+    "pillow>=11,<13",
+    "httpx>=0.27,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["miette*"]
+
+[tool.setuptools.package-data]
+miette = ["fonts/*", "static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
