@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "miette"
 version = "0.1.0"
-description = "Histoires et jeux imprimés sur une imprimante thermique de caisse, pour les 3 à 5 ans."
+description = "Petites histoires imprimées sur une imprimante thermique de caisse, pour les tout-petits."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"

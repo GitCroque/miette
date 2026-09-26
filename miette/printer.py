@@ -85,14 +85,3 @@ def print_image(host: str, port: int, image: Image.Image) -> None:
         printer.close()
     except (OSError, EscposError) as exc:
         raise PrinterError("L'impression a échoué en cours de route.") from exc
-
-
-def print_with(host: str, port: int, compose) -> None:
-    """Imprime ce que `compose(printer)` envoie, puis coupe."""
-    try:
-        printer = connect(host, port)
-        compose(printer)
-        printer.cut()
-        printer.close()
-    except (OSError, EscposError) as exc:
-        raise PrinterError("L'impression a échoué en cours de route.") from exc

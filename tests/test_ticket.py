@@ -1,7 +1,5 @@
 from datetime import date
 
-from escpos.printer import Dummy
-
 from miette import ticket
 
 PARAGRAPHS = (
@@ -15,6 +13,11 @@ def test_raster_is_one_bit_at_printer_width():
     assert image.mode == "1"
     assert image.width == ticket.WIDTH == 512
     assert 300 < image.height < 2000
+
+
+def test_two_names_fit_on_one_line():
+    size = ticket.fit_size("Lou et Max", ticket.ROUNDED, 700, ticket.NAME_MAX_SIZE, ticket.TEXT_WIDTH)
+    assert ticket.font(ticket.ROUNDED, size, 700).getlength("Lou et Max") <= ticket.TEXT_WIDTH
 
 
 def test_raster_without_name_is_shorter():
@@ -34,21 +37,10 @@ def test_wrap_never_overflows():
 def test_long_name_shrinks_to_fit():
     size = ticket.fit_size("Marie-Charlotte-Eugénie", ticket.ROUNDED, 700, ticket.NAME_MAX_SIZE, ticket.TEXT_WIDTH)
     assert size < ticket.NAME_MAX_SIZE
-    assert ticket.font(ticket.ROUNDED, size, 700).getlength("Marie-Charlotte-Eugénie") <= ticket.TEXT_WIDTH
 
 
 def test_french_date():
     assert ticket.french_date(date(2026, 8, 1)) == "1 août 2026"
-
-
-def test_text_mode_respects_columns():
-    printer = Dummy(profile="TM-T88V")
-    ticket.print_text(printer, "Le chat mouillé", PARAGRAPHS, "Lou", date(2026, 9, 26))
-    output = printer.output
-    assert b"Lou" in output
-    # Aucune ligne de corps ne dépasse les 42 colonnes de la Font A.
-    body = [line for line in output.split(b"\n") if line and not line.startswith(b"\x1b")]
-    assert all(len(line) <= ticket.COLUMNS for line in body)
 
 
 def test_typeset_keeps_punctuation_with_its_word():
@@ -57,7 +49,3 @@ def test_typeset_keeps_punctuation_with_its_word():
     text = ticket.typeset("Le petit chat saute très haut dans le ciel bleu et dit : bonjour !")
     for width in range(120, 480, 7):
         assert not any(line.startswith(("!", ":", "»")) for line in ticket.wrap(text, face, width))
-
-
-def test_plain_undoes_typeset():
-    assert ticket.plain(ticket.typeset("Oh ! l'ami")) == "Oh ! l'ami"

@@ -1,22 +1,28 @@
 # Miette
 
 Une imprimante thermique de caisse posée dans la maison, et une page web sur le
-téléphone : un appui, et une petite histoire sort du rouleau, écrite pour un
-enfant de 3 à 5 ans qui en est le héros. La machine ne produit pas des
+téléphone : un appui, et une petite histoire du quotidien sort du rouleau,
+écrite pour un tout-petit à partir de 2 ans. La machine ne produit pas des
 documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
 
 ## Ce que fait l'app
 
-- Une page unique, pensée pour l'écran d'accueil de l'iPhone : un prénom, un
-  thème (ou une surprise), un bouton.
-- L'histoire est écrite par un modèle Claude via [OpenRouter](https://openrouter.ai)
-  (80 à 150 mots, une seule péripétie, une fin rassurante), puis composée en
-  image avec Pillow et envoyée à l'imprimante en ESC/POS sur TCP 9100.
-- L'état de l'imprimante (papier, capot, massicot) est lu avant d'écrire
-  l'histoire : on ne paie pas un texte qui ne pourra pas sortir.
-- Les histoires sont gardées dans un carnet (`histoires.jsonl`) et se
-  réimpriment sans nouvel appel au modèle.
-- Un plafond quotidien protège contre un bouton qui s'emballe.
+- Une page unique, pensée pour l'écran d'accueil de l'iPhone : choisir un
+  enfant (ou plusieurs), puis Surprise ou une occasion (anniversaire, fêtes,
+  voyage et visites, premières fois), lire l'aperçu, imprimer ou en demander
+  une autre.
+- Une fiche par enfant dans les réglages : prénom, mois de naissance, doudou,
+  animaux de la maison, crèche, nounou, copains. L'âge calculé règle la
+  longueur et le vocabulaire, les détails se glissent dans les histoires.
+- L'histoire est écrite par un modèle Claude via [OpenRouter](https://openrouter.ai) :
+  une situation du quotidien et au plus une petite émotion, dans l'esprit des
+  livres pour tout-petits, puis composée en image avec Pillow et envoyée à
+  l'imprimante en ESC/POS sur TCP 9100.
+- L'état de l'imprimante (papier, capot, massicot) est lu avant d'imprimer.
+- Fiches et histoires vivent dans une base SQLite sur le volume (`miette.db`) :
+  une histoire se réimprime sans nouvel appel au modèle, et les titres récents
+  sont écartés pour éviter les redites.
+- Un plafond quotidien d'histoires écrites protège contre un bouton qui s'emballe.
 
 ## Matériel
 
@@ -34,9 +40,8 @@ pas de profil TM-T88VI, celui de la TM-T88V a les mêmes caractéristiques.
 | `MIETTE_IMPRIMANTE_PORT` | Port ESC/POS brut | `9100` |
 | `OPENROUTER_API_KEY` | Clé OpenRouter | aucun, obligatoire |
 | `MIETTE_MODELE` | Modèle OpenRouter | `anthropic/claude-sonnet-5` |
-| `MIETTE_RENDU` | `raster` (page composée en image) ou `texte` (police de la machine) | `raster` |
 | `MIETTE_LIMITE_JOUR` | Nombre maximal d'histoires générées par jour | `20` |
-| `MIETTE_DONNEES` | Dossier du carnet d'histoires | `/data` dans l'image |
+| `MIETTE_DONNEES` | Dossier de la base (fiches et histoires) | `/data` dans l'image |
 
 Sonnet 5 plutôt que Haiku 4.5 : sur un premier essai, Haiku laissait environ
 une faute de français par histoire (accords, « calm » pour « calme »), Sonnet
@@ -50,9 +55,10 @@ docker run -d -p 8090:8090 -v miette-data:/data \
   ghcr.io/gitcroque/miette:latest
 ```
 
-Puis ouvrir `http://<hôte>:8090` sur le téléphone et l'ajouter à l'écran
-d'accueil. L'app n'a pas d'authentification : elle est faite pour le réseau
-de la maison, pas pour Internet.
+Puis ouvrir `http://<hôte>:8090` sur le téléphone, créer les fiches dans les
+réglages, et ajouter la page à l'écran d'accueil. L'app n'a pas
+d'authentification : sur Internet, la mettre derrière un proxy qui en fournit
+une (Cloudflare Access, par exemple).
 
 ## Développer
 

@@ -49,55 +49,58 @@
       max-width: 560px;
       margin: 0 auto;
     }
-    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 18px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 18px; }
     h1 { font-size: 34px; margin: 0; letter-spacing: -0.5px; }
     h1 span { color: var(--accent); }
+    .head-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .pill {
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex; align-items: center; gap: 8px; min-width: 0;
       font-size: 15px; padding: 7px 12px; border-radius: 999px;
       background: var(--card); border: 1px solid var(--line); color: var(--soft);
-      max-width: 60%; text-align: right;
     }
+    .pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pill::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--soft); flex: none; }
     .pill.ok::before { background: var(--ok); }
     .pill.warn::before { background: var(--warn); }
     .pill.bad::before { background: var(--bad); }
+    .icon-btn {
+      flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
+      background: var(--card); color: var(--ink); font-size: 20px; display: grid; place-items: center; text-decoration: none;
+    }
     section { margin-bottom: 22px; }
-    label.title { display: block; font-size: 15px; color: var(--soft); margin: 0 0 8px 4px; }
-    .who { display: flex; gap: 10px; }
-    input[type=text] {
-      flex: 1; min-width: 0; font: inherit; font-size: 20px; color: var(--ink);
-      padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--card);
+    .label { display: block; font-size: 15px; color: var(--soft); margin: 0 0 8px 4px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip {
+      font: inherit; font-size: 19px; font-weight: 700; color: var(--ink);
+      min-height: 52px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
     }
-    input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px; }
-    .seg button {
-      font: inherit; font-size: 17px; border: 0; background: none; color: var(--soft);
-      padding: 0 16px; border-radius: 12px; min-height: 48px;
+    .chip[aria-pressed=true] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    .surprise {
+      font: inherit; font-size: 22px; font-weight: 700; width: 100%; min-height: 84px;
+      border: 0; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
     }
-    .seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); }
-    .themes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .theme {
-      font: inherit; font-size: 18px; font-weight: 600; color: var(--ink);
-      display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 6px;
-      min-height: 104px; padding: 14px 16px; text-align: left;
-      background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-      transition: transform .08s ease;
+    .occasions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .occasion {
+      font: inherit; font-size: 17px; font-weight: 600; color: var(--ink); text-align: left;
+      display: flex; align-items: center; gap: 10px; min-height: 62px; padding: 10px 14px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 18px;
     }
-    .theme .emoji { font-size: 34px; line-height: 1; }
-    .theme:active { transform: scale(.97); }
-    .theme.surprise { grid-column: span 2; min-height: 72px; flex-direction: row; align-items: center; justify-content: center; background: var(--accent); color: var(--accent-ink); border-color: transparent; }
-    .theme.surprise .emoji { font-size: 26px; }
-    .other { display: flex; gap: 10px; margin-top: 12px; }
-    .go {
-      font: inherit; font-weight: 700; font-size: 18px; border: 0; border-radius: 16px;
-      padding: 0 20px; min-height: 54px; background: var(--ink); color: var(--paper);
-    }
+    .occasion .emoji { font-size: 26px; line-height: 1; }
+    .surprise:active, .occasion:active, .chip:active { transform: scale(.97); }
+    button { transition: transform .08s ease; }
     button:disabled { opacity: .45; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
-    .card h2 { margin: 0 0 10px; font-size: 22px; }
-    .card p { margin: 0 0 10px; font-family: Georgia, "Times New Roman", serif; font-size: 18px; }
-    .card .actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+    .card .meta { font-size: 14px; color: var(--soft); margin-bottom: 4px; }
+    .card h2 { margin: 0 0 10px; font-size: 23px; line-height: 1.25; }
+    .card .story p { margin: 0 0 10px; font-family: Georgia, "Times New Roman", serif; font-size: 18px; }
+    .actions { display: flex; gap: 10px; margin-top: 12px; }
+    .primary, .secondary {
+      font: inherit; font-weight: 700; font-size: 18px; border-radius: 16px; min-height: 56px; padding: 0 18px;
+    }
+    .primary { flex: 1; border: 0; background: var(--ink); color: var(--paper); }
+    .secondary { border: 1px solid var(--line); background: none; color: var(--ink); }
+    .done { color: var(--ok); font-weight: 700; font-size: 16px; margin-top: 10px; }
     .ghost {
       font: inherit; font-size: 16px; font-weight: 600; color: var(--accent);
       background: none; border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; min-height: 44px;
@@ -108,7 +111,7 @@
     ul.history .t { font-weight: 600; }
     ul.history .d { font-size: 14px; color: var(--soft); }
     .notice { font-size: 15px; color: var(--soft); text-align: center; margin-top: 8px; }
-    .error { background: color-mix(in srgb, var(--bad) 12%, var(--card)); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); color: var(--ink); }
+    .error { background: color-mix(in srgb, var(--bad) 12%, var(--card)); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
     .overlay {
       position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 18px;
       background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -123,57 +126,88 @@
     .ticket::before { top: 22px; }
     .ticket::after { top: 40px; right: 34px; }
     @keyframes feed { 0% { transform: translateY(-14px); } 50% { transform: translateY(6px); } 100% { transform: translateY(-14px); } }
+
+    /* Réglages */
+    .field { display: block; margin-bottom: 12px; }
+    .field span { display: block; font-size: 14px; color: var(--soft); margin: 0 0 5px 2px; }
+    .field input {
+      width: 100%; font: inherit; font-size: 18px; color: var(--ink);
+      padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--paper);
+    }
+    .field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+    .seg { display: flex; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 3px; margin-bottom: 12px; }
+    .seg button { font: inherit; font-size: 16px; border: 0; background: none; color: var(--soft); padding: 0 14px; border-radius: 11px; min-height: 44px; }
+    .seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); }
+    .child-card { margin-bottom: 14px; }
+    .child-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .child-card .top strong { font-size: 20px; }
+    .add { width: 100%; margin-bottom: 14px; }
+    .privacy { font-size: 14px; color: var(--soft); margin: 4px 4px 16px; }
+    .save-bar { position: sticky; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; }
     [hidden] { display: none !important; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Miette<span>.</span></h1>
-    <div class="pill" id="status" role="status">…</div>
-  </header>
-
-  <section>
-    <label class="title" for="name">Pour qui ?</label>
-    <div class="who">
-      <input type="text" id="name" autocomplete="off" autocapitalize="words" placeholder="Prénom" maxlength="30">
-      <div class="seg" role="group" aria-label="Accord">
-        <button type="button" data-pronoun="elle" aria-pressed="true">elle</button>
-        <button type="button" data-pronoun="il" aria-pressed="false">il</button>
+  <main id="view-main">
+    <header>
+      <h1>Miette<span>.</span></h1>
+      <div class="head-right">
+        <div class="pill" id="status" role="status"><span>…</span></div>
+        <a class="icon-btn" href="#reglages" aria-label="Réglages">⚙︎</a>
       </div>
-    </div>
-  </section>
+    </header>
 
-  <section>
-    <label class="title">Une histoire sur…</label>
-    <div class="themes">
-      <button class="theme" data-theme="les dinosaures"><span class="emoji">🦕</span>Les dinosaures</button>
-      <button class="theme" data-theme="la mer"><span class="emoji">🌊</span>La mer</button>
-      <button class="theme" data-theme="le chat de la maison"><span class="emoji">🐈</span>Le chat de la maison</button>
-      <button class="theme" data-theme="la forêt"><span class="emoji">🌳</span>La forêt</button>
-      <button class="theme" data-theme="l'espace"><span class="emoji">🚀</span>L'espace</button>
-      <button class="theme" data-theme="la ferme"><span class="emoji">🐄</span>La ferme</button>
-      <button class="theme surprise" data-theme=""><span class="emoji">✨</span>Surprise</button>
-    </div>
-    <form class="other" id="other">
-      <input type="text" id="custom" placeholder="Autre thème…" maxlength="80" autocomplete="off">
-      <button class="go" type="submit">Go</button>
-    </form>
-  </section>
+    <section id="empty" hidden>
+      <div class="card">
+        <h2>Bienvenue</h2>
+        <p>Commence par créer une fiche pour chaque enfant : prénom, mois de naissance, doudou…</p>
+        <div class="actions"><a class="primary" href="#reglages" style="display:grid;place-items:center;text-decoration:none">Créer les fiches</a></div>
+      </div>
+    </section>
 
-  <section id="result" hidden>
-    <div class="card" id="result-card">
-      <h2 id="result-title"></h2>
-      <div id="result-text"></div>
-      <div class="actions"><button class="ghost" id="result-reprint" hidden>Réimprimer</button></div>
-    </div>
-  </section>
+    <section id="who" hidden>
+      <span class="label">Pour qui ?</span>
+      <div class="chips" id="chips"></div>
+    </section>
 
-  <section id="past" hidden>
-    <label class="title">Dernières histoires</label>
-    <div class="card"><ul class="history" id="history"></ul></div>
-  </section>
+    <section id="go" hidden>
+      <button class="surprise" id="surprise"><span>✨</span>Surprise</button>
+      <div class="occasions" id="occasions"></div>
+    </section>
 
-  <p class="notice" id="notice"></p>
+    <section id="preview" hidden>
+      <div class="card" id="preview-card">
+        <div class="meta" id="preview-meta"></div>
+        <h2 id="preview-title"></h2>
+        <div class="story" id="preview-text"></div>
+        <div class="actions" id="preview-actions">
+          <button class="primary" id="print">Imprimer</button>
+          <button class="secondary" id="another">Une autre</button>
+        </div>
+        <div class="done" id="preview-done" hidden>Imprimée ✓</div>
+      </div>
+    </section>
+
+    <section id="past" hidden>
+      <span class="label">Dernières histoires imprimées</span>
+      <div class="card"><ul class="history" id="history"></ul></div>
+    </section>
+
+    <p class="notice" id="notice"></p>
+  </main>
+
+  <main id="view-settings" hidden>
+    <header>
+      <a class="icon-btn" href="#" aria-label="Retour">←</a>
+      <h1 style="font-size:26px;flex:1;margin-left:4px">Réglages</h1>
+    </header>
+    <p class="privacy">Ces fiches restent sur le serveur de la maison. Les détails servent à glisser le doudou, la crèche ou les copains dans les histoires, et partent avec chaque demande vers le modèle qui écrit.</p>
+    <div id="children-forms"></div>
+    <button class="secondary add" id="add-child">＋ Ajouter un enfant</button>
+    <div class="save-bar"><button class="primary" id="save">Enregistrer</button></div>
+    <p class="notice" id="settings-notice"></p>
+  </main>
 
   <div class="overlay" id="overlay" aria-live="polite">
     <div class="ticket"></div>
@@ -186,134 +220,264 @@
       get(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } },
       set(key, value) { try { localStorage.setItem(key, value); } catch {} },
     };
+    const EMOJIS = { "anniversaire": "🎂", "fetes": "🎄", "voyage": "🧳", "premieres-fois": "🌱" };
+    const FIELDS = [
+      ["prenom", "Prénom", "Prénom"],
+      ["naissance", "Mois de naissance", ""],
+      ["doudou", "Doudou", "Lapinou, un lapin gris"],
+      ["animaux", "Animaux de la maison", "Pistache, le chat"],
+      ["creche", "Crèche ou école", "la crèche des Lilas"],
+      ["nounou", "Nounou", ""],
+      ["copains", "Copains", "Léo, Inès"],
+    ];
 
-    let pronoun = store.get("miette.pronom", "elle");
+    let state = null;
     let busy = false;
-    const nameInput = $("#name");
-    nameInput.value = store.get("miette.prenom", "");
-    nameInput.addEventListener("input", () => store.set("miette.prenom", nameInput.value.trim()));
-
-    function setPronoun(value) {
-      pronoun = value;
-      store.set("miette.pronom", value);
-      document.querySelectorAll("[data-pronoun]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pronoun === value)));
-    }
-    document.querySelectorAll("[data-pronoun]").forEach((b) => b.addEventListener("click", () => setPronoun(b.dataset.pronoun)));
-    setPronoun(pronoun);
+    let current = null;       // histoire affichée en aperçu
+    let lastRequest = null;   // pour « Une autre »
+    let selected = JSON.parse(store.get("miette.enfants", "[]"));
 
     function escapeHtml(text) {
-      return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
-
     function when(iso) {
       const d = new Date(iso);
-      return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) + ", " +
-        d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
     }
-
     function setBusy(on, text) {
       busy = on;
       $("#overlay").classList.toggle("on", on);
       if (text) $("#overlay-text").textContent = text;
-      document.querySelectorAll(".theme, .go, .ghost").forEach((b) => (b.disabled = on));
+      document.querySelectorAll("button").forEach((b) => (b.disabled = on));
     }
-
-    function showResult(title, text, id, isError) {
-      $("#result").hidden = false;
-      $("#result-card").classList.toggle("error", !!isError);
-      $("#result-title").textContent = title;
-      $("#result-text").innerHTML = text.split(/\n\s*\n/).map((p) => `<p>${escapeHtml(p)}</p>`).join("");
-      const reprint = $("#result-reprint");
-      reprint.hidden = !id;
-      reprint.onclick = id ? () => reprintStory(id) : null;
-      $("#result").scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-
-    async function call(url, body) {
+    async function api(method, url, body) {
       const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method,
+        headers: body ? { "Content-Type": "application/json" } : {},
         body: body ? JSON.stringify(body) : undefined,
       });
       let data = {};
       try { data = await response.json(); } catch {}
-      if (!response.ok) throw new Error(data.detail || `Erreur ${response.status}`);
+      if (!response.ok) {
+        const detail = Array.isArray(data.detail) ? "Champ invalide : " + (data.detail[0]?.loc || []).slice(-1)[0] : data.detail;
+        throw new Error(detail || `Erreur ${response.status}`);
+      }
       return data;
     }
 
-    async function newStory(theme) {
+    // Vue principale
+
+    function renderChips() {
+      const known = state.enfants.map((c) => c.id);
+      selected = selected.filter((id) => known.includes(id));
+      if (!selected.length && known.length) selected = [known[0]];
+      store.set("miette.enfants", JSON.stringify(selected));
+      const chips = $("#chips");
+      chips.innerHTML = "";
+      state.enfants.forEach((child) => {
+        const b = document.createElement("button");
+        b.className = "chip";
+        b.textContent = child.prenom;
+        b.setAttribute("aria-pressed", String(selected.includes(child.id)));
+        b.addEventListener("click", () => {
+          if (selected.includes(child.id)) {
+            if (selected.length > 1) selected = selected.filter((id) => id !== child.id);
+          } else {
+            selected.push(child.id);
+          }
+          renderChips();
+        });
+        chips.appendChild(b);
+      });
+    }
+
+    function renderOccasions() {
+      const box = $("#occasions");
+      if (box.childElementCount) return;
+      Object.entries(state.occasions).forEach(([key, label]) => {
+        const b = document.createElement("button");
+        b.className = "occasion";
+        b.innerHTML = `<span class="emoji">${EMOJIS[key] || "✨"}</span>${escapeHtml(label)}`;
+        b.addEventListener("click", () => write({ enfants: [...selected], occasion: key }));
+        box.appendChild(b);
+      });
+    }
+
+    function showPreview(story, isError) {
+      current = isError ? null : story;
+      $("#preview").hidden = false;
+      $("#preview-card").classList.toggle("error", !!isError);
+      const occasion = story.occasion ? " · " + (state.occasions[story.occasion] || "") : "";
+      $("#preview-meta").textContent = isError ? "" : `Pour ${story.pour}${occasion}`;
+      $("#preview-title").textContent = story.titre;
+      $("#preview-text").innerHTML = story.texte.split(/\n\s*\n/).map((p) => `<p>${escapeHtml(p)}</p>`).join("");
+      $("#preview-actions").hidden = !!isError && !lastRequest;
+      $("#print").hidden = !!isError;
+      $("#print").textContent = story.imprimee ? "Réimprimer" : "Imprimer";
+      $("#preview-done").hidden = !story.imprimee;
+      $("#preview").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function write(request) {
       if (busy) return;
+      lastRequest = request;
       setBusy(true, "Miette écrit l'histoire…");
-      const slow = setTimeout(() => $("#overlay-text").textContent = "Presque… le ticket arrive.", 6000);
       try {
-        const data = await call("/api/histoire", { theme, prenom: nameInput.value.trim(), pronom: pronoun });
-        showResult(data.titre, data.texte, data.id, false);
+        showPreview(await api("POST", "/api/histoires", request), false);
       } catch (error) {
-        showResult("Pas d'histoire cette fois", error.message, null, true);
+        showPreview({ titre: "Pas d'histoire cette fois", texte: error.message }, true);
       } finally {
-        clearTimeout(slow);
         setBusy(false);
         refresh();
       }
     }
 
-    async function reprintStory(id) {
+    async function printStory(id) {
       if (busy) return;
-      setBusy(true, "Réimpression…");
+      setBusy(true, "Impression…");
       try {
-        await call(`/api/reimprimer/${id}`);
+        const story = await api("POST", `/api/histoires/${id}/imprimer`);
+        if (current && current.id === id) showPreview(story, false);
       } catch (error) {
-        showResult("Réimpression impossible", error.message, null, true);
+        showPreview({ titre: "Impression impossible", texte: error.message }, true);
       } finally {
         setBusy(false);
         refresh();
       }
     }
 
-    document.querySelectorAll(".theme").forEach((b) => b.addEventListener("click", () => newStory(b.dataset.theme)));
-    $("#other").addEventListener("submit", (event) => {
-      event.preventDefault();
-      const theme = $("#custom").value.trim();
-      if (theme) newStory(theme);
-    });
+    $("#surprise").addEventListener("click", () => write({ enfants: [...selected], occasion: null }));
+    $("#another").addEventListener("click", () => lastRequest && write(lastRequest));
+    $("#print").addEventListener("click", () => current && printStory(current.id));
 
     async function refresh() {
       try {
-        const response = await fetch("/api/etat");
-        const state = await response.json();
-        const pill = $("#status");
-        pill.textContent = state.imprimante;
-        pill.className = "pill " + (!state.prete ? "bad" : state.papier_bas ? "warn" : "ok");
-
-        const list = $("#history");
-        list.innerHTML = "";
-        state.histoires.forEach((h) => {
-          const li = document.createElement("li");
-          li.innerHTML = `<div><div class="t">${escapeHtml(h.titre)}</div><div class="d">${escapeHtml(when(h.date))}</div></div>`;
-          const button = document.createElement("button");
-          button.className = "ghost";
-          button.textContent = "Réimprimer";
-          button.disabled = busy;
-          button.addEventListener("click", () => reprintStory(h.id));
-          li.appendChild(button);
-          list.appendChild(li);
-        });
-        $("#past").hidden = state.histoires.length === 0;
-
-        const notes = [];
-        if (!state.cle) notes.push("Clé OpenRouter absente : aucune histoire ne peut être écrite.");
-        notes.push(`${state.restantes} histoire${state.restantes > 1 ? "s" : ""} encore possible${state.restantes > 1 ? "s" : ""} aujourd'hui.`);
-        $("#notice").textContent = notes.join(" ");
+        state = await api("GET", "/api/etat");
       } catch {
-        const pill = $("#status");
-        pill.textContent = "Miette injoignable";
-        pill.className = "pill bad";
+        $("#status").className = "pill bad";
+        $("#status").innerHTML = "<span>Miette injoignable</span>";
+        return;
       }
+      $("#status").className = "pill " + (!state.prete ? "bad" : state.papier_bas ? "warn" : "ok");
+      $("#status").innerHTML = `<span>${escapeHtml(state.imprimante)}</span>`;
+
+      const hasChildren = state.enfants.length > 0;
+      $("#empty").hidden = hasChildren;
+      $("#who").hidden = !hasChildren;
+      $("#go").hidden = !hasChildren;
+      if (hasChildren) { renderChips(); renderOccasions(); }
+
+      const list = $("#history");
+      list.innerHTML = "";
+      state.histoires.forEach((h) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<div><div class="t">${escapeHtml(h.titre)}</div><div class="d">${escapeHtml(h.pour)}, ${escapeHtml(when(h.date))}</div></div>`;
+        const b = document.createElement("button");
+        b.className = "ghost";
+        b.textContent = "Réimprimer";
+        b.disabled = busy;
+        b.addEventListener("click", () => printStory(h.id));
+        li.appendChild(b);
+        list.appendChild(li);
+      });
+      $("#past").hidden = state.histoires.length === 0;
+
+      const notes = [];
+      if (!state.cle) notes.push("Clé OpenRouter absente : aucune histoire ne peut être écrite.");
+      notes.push(`${state.restantes} histoire${state.restantes > 1 ? "s" : ""} encore possible${state.restantes > 1 ? "s" : ""} aujourd'hui.`);
+      $("#notice").textContent = notes.join(" ");
     }
 
-    refresh();
-    setInterval(() => { if (!busy && !document.hidden) refresh(); }, 20000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    // Réglages
+
+    let drafts = [];
+
+    function childForm(child, index) {
+      const card = document.createElement("div");
+      card.className = "card child-card";
+      const title = escapeHtml(child.prenom || "Nouvel enfant");
+      card.innerHTML = `<div class="top"><strong>${title}</strong><button class="ghost" data-remove>Retirer</button></div>`;
+      FIELDS.forEach(([key, label, placeholder]) => {
+        const field = document.createElement("label");
+        field.className = "field";
+        const type = key === "naissance" ? "month" : "text";
+        field.innerHTML = `<span>${label}</span><input type="${type}" data-key="${key}" placeholder="${escapeHtml(placeholder)}" autocomplete="off">`;
+        field.querySelector("input").value = child[key] || "";
+        field.querySelector("input").addEventListener("input", (event) => { drafts[index][key] = event.target.value; });
+        card.appendChild(field);
+        if (key === "naissance") {
+          const label = document.createElement("div");
+          label.className = "field";
+          label.innerHTML = "<span>Accord</span>";
+          card.appendChild(label);
+          const seg = document.createElement("div");
+          seg.className = "seg";
+          ["elle", "il"].forEach((value) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.textContent = value;
+            b.setAttribute("aria-pressed", String((child.accord || "elle") === value));
+            b.addEventListener("click", () => {
+              drafts[index].accord = value;
+              seg.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+            });
+            seg.appendChild(b);
+          });
+          card.appendChild(seg);
+        }
+      });
+      card.querySelector("[data-remove]").addEventListener("click", () => {
+        drafts.splice(index, 1);
+        renderForms();
+      });
+      return card;
+    }
+
+    function renderForms() {
+      const box = $("#children-forms");
+      box.innerHTML = "";
+      drafts.forEach((child, index) => box.appendChild(childForm(child, index)));
+      $("#add-child").hidden = drafts.length >= 6;
+    }
+
+    async function openSettings() {
+      $("#settings-notice").textContent = "";
+      try {
+        drafts = await api("GET", "/api/enfants");
+      } catch (error) {
+        drafts = [];
+        $("#settings-notice").textContent = error.message;
+      }
+      if (!drafts.length) drafts = [{ accord: "elle" }];
+      renderForms();
+    }
+
+    $("#add-child").addEventListener("click", () => { drafts.push({ accord: "elle" }); renderForms(); });
+    $("#save").addEventListener("click", async () => {
+      const cleaned = drafts
+        .map((c) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v])))
+        .filter((c) => c.prenom);
+      try {
+        await api("PUT", "/api/enfants", cleaned);
+        location.hash = "";
+      } catch (error) {
+        $("#settings-notice").textContent = error.message;
+      }
+    });
+
+    // Navigation
+
+    function route() {
+      const settings = location.hash === "#reglages";
+      $("#view-main").hidden = settings;
+      $("#view-settings").hidden = !settings;
+      window.scrollTo(0, 0);
+      if (settings) openSettings(); else refresh();
+    }
+    window.addEventListener("hashchange", route);
+    route();
+    setInterval(() => { if (!busy && !document.hidden && location.hash !== "#reglages") refresh(); }, 20000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && location.hash !== "#reglages") refresh(); });
   </script>
 </body>
 </html>

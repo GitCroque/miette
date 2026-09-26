@@ -4,16 +4,15 @@ Valeurs mesurées sur la TM-T88VI le 2026-09-26 : 512 points utiles, 180 dpi
 dans les deux sens, 42 colonnes en Font A. Le texte composé en image reste
 lisible dès 18 points et confortable à partir de 22.
 
-Le raster compose toute la page avec Pillow, dans des polices libres
-embarquées : Fredoka (ronde) pour le prénom et le titre, Gelasio (à
-empattements, métriques de Georgia) pour le corps. Le mode texte utilise la
-police de la machine : plus rapide, mais typographie imposée.
+Toute la page est composée avec Pillow, dans des polices libres embarquées :
+Fredoka (ronde) pour le prénom et le titre, Gelasio (à empattements,
+métriques de Georgia) pour le corps. Le mode texte ESC/POS, avec la police de
+la machine, a été comparé sur papier le 2026-09-26 et écarté.
 """
 
 from __future__ import annotations
 
 import re
-import textwrap
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -23,7 +22,6 @@ from PIL import Image, ImageDraw, ImageFont
 WIDTH = 512
 MARGIN = 14
 TEXT_WIDTH = WIDTH - 2 * MARGIN
-COLUMNS = 42
 THRESHOLD = 128
 
 FONTS = Path(__file__).parent / "fonts"
@@ -49,11 +47,6 @@ def typeset(text: str) -> str:
     text = re.sub(r" ([!?:;»])", NBSP + r"\1", text)
     text = re.sub(r"« ", "«" + NBSP, text)
     return text.replace("'", "\u2019")
-
-
-def plain(text: str) -> str:
-    """Pour la police de la machine, qui n'a ni insécable ni apostrophe courbe."""
-    return text.replace(NBSP, " ").replace("\u2019", "'")
 
 
 def french_date(day: date) -> str:
@@ -156,29 +149,3 @@ def render_raster(title: str, paragraphs: tuple[str, ...], name: str,
     page.space(14)
     page.line(f"Miette, le {french_date(day)}", font(SERIF_ITALIC, 20), 28, center=True)
     return page.finish()
-
-
-def print_text(printer, title: str, paragraphs: tuple[str, ...], name: str,
-               day: date) -> None:
-    """Même ticket en mode texte ESC/POS, avec la police de la machine."""
-    if name:
-        printer.set_with_default(align="center")
-        printer.text("Une histoire pour\n")
-        printer.set_with_default(align="center", bold=True,
-                                 double_width=True, double_height=True)
-        printer.text(name + "\n\n")
-
-    printer.set_with_default(align="center", bold=True, double_height=True)
-    for line in textwrap.wrap(plain(title), COLUMNS):
-        printer.text(line + "\n")
-    printer.text("\n")
-
-    printer.set_with_default()
-    for paragraph in paragraphs:
-        for line in textwrap.wrap(plain(paragraph), COLUMNS):
-            printer.text(line + "\n")
-        printer.text("\n")
-
-    printer.set_with_default(align="center", font="b")
-    printer.text(f"Miette, le {french_date(day)}\n")
-    printer.set_with_default()

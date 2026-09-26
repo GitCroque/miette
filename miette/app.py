@@ -1,4 +1,8 @@
-"""Serveur web de Miette : une page pour le téléphone, une API pour imprimer."""
+"""Serveur web de Miette : une page pour le téléphone, une API pour imprimer.
+
+Déroulé décidé le 2026-09-26 : choisir l'enfant (ou les deux), Surprise ou
+une occasion, lire l'aperçu, puis imprimer ou en demander une autre.
+"""
 
 from __future__ import annotations
 
@@ -14,46 +18,58 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config, printer, story, ticket
-from .history import Entry, History
+from .store import Store, StoredStory
 
 STATIC = Path(__file__).parent / "static"
+MAX_CHILDREN = 6
 
 log = logging.getLogger("miette")
 settings = config.load()
-history = History(settings.data_dir)
-# Une seule impression à la fois : deux appuis rapprochés ne doivent ni
-# payer deux histoires ni entremêler deux tickets.
-busy = threading.Lock()
+store = Store(settings.data_dir)
+# Une seule impression à la fois : deux appuis rapprochés ne doivent pas
+# entremêler deux tickets.
+printing = threading.Lock()
 
 app = FastAPI(title="Miette", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+class Child(BaseModel):
+    id: str = Field("", max_length=16)
+    prenom: str = Field(min_length=1, max_length=30)
+    naissance: str = Field("", pattern=r"^(\d{4}-(0[1-9]|1[0-2]))?$")
+    accord: Literal["elle", "il"] = "elle"
+    doudou: str = Field("", max_length=80)
+    animaux: str = Field("", max_length=120)
+    creche: str = Field("", max_length=80)
+    nounou: str = Field("", max_length=80)
+    copains: str = Field("", max_length=120)
+
+
 class StoryRequest(BaseModel):
-    theme: str = Field("", max_length=120)
-    prenom: str = Field("", max_length=40)
-    pronom: Literal["elle", "il"] = "elle"
-    rendu: Literal["raster", "texte"] | None = None
+    enfants: list[str] = Field(min_length=1, max_length=MAX_CHILDREN)
+    occasion: Literal["anniversaire", "fetes", "voyage", "premieres-fois"] | None = None
 
 
-def _summary(entry: Entry) -> dict:
-    return {"id": entry.id, "titre": entry.title, "prenom": entry.name, "date": entry.at}
+def _names(ids: list[str]) -> str:
+    by_id = {c["id"]: c["prenom"] for c in store.children()}
+    names = [by_id.get(i, "") for i in ids]
+    names = [n for n in names if n]
+    if len(names) <= 1:
+        return names[0] if names else ""
+    return ", ".join(names[:-1]) + " et " + names[-1]
 
 
-def _print(title: str, paragraphs: tuple[str, ...], name: str, rendering: str) -> None:
-    host, port = settings.printer_host, settings.printer_port
-    if rendering == "texte":
-        printer.print_with(host, port, lambda p: ticket.print_text(
-            p, title, paragraphs, name, date.today()))
-    else:
-        image = ticket.render_raster(title, paragraphs, name, date.today())
-        printer.print_image(host, port, image)
-
-
-def _check_printer() -> None:
-    state = printer.status(settings.printer_host, settings.printer_port)
-    if not state.ready:
-        raise HTTPException(503, state.message)
+def _public(entry: StoredStory) -> dict:
+    return {
+        "id": entry.id,
+        "titre": entry.title,
+        "texte": "\n\n".join(entry.paragraphs),
+        "pour": _names(entry.children),
+        "occasion": entry.occasion,
+        "date": entry.created,
+        "imprimee": entry.printed,
+    }
 
 
 @app.get("/", include_in_schema=False)
@@ -84,52 +100,67 @@ def state() -> dict:
         "prete": status.ready,
         "papier_bas": status.paper_low,
         "cle": bool(settings.openrouter_key),
-        "restantes": max(0, settings.daily_limit - history.count_today()),
-        "histoires": [_summary(e) for e in history.recent()],
+        "restantes": max(0, settings.daily_limit - store.written_today()),
+        "enfants": [{"id": c["id"], "prenom": c["prenom"]} for c in store.children()],
+        "occasions": story.OCCASIONS,
+        "histoires": [_public(e) for e in store.printed()],
     }
 
 
-@app.post("/api/histoire")
-def new_story(request: StoryRequest) -> dict:
-    if not busy.acquire(blocking=False):
-        raise HTTPException(409, "Une histoire est déjà en cours d'impression.")
+@app.get("/api/enfants")
+def children() -> list[dict]:
+    return store.children()
+
+
+@app.put("/api/enfants")
+def save_children(children: list[Child]) -> list[dict]:
+    if len(children) > MAX_CHILDREN:
+        raise HTTPException(422, f"{MAX_CHILDREN} fiches au plus.")
+    return store.save_children([c.model_dump() for c in children])
+
+
+@app.post("/api/histoires")
+def write_story(request: StoryRequest) -> dict:
+    """Écrit une histoire et la renvoie en aperçu, sans l'imprimer."""
+    by_id = {c["id"]: c for c in store.children()}
+    chosen = [by_id[i] for i in dict.fromkeys(request.enfants) if i in by_id]
+    if not chosen:
+        raise HTTPException(422, "Aucune fiche enfant ne correspond : les créer dans les réglages.")
+    if store.written_today() >= settings.daily_limit:
+        raise HTTPException(429, f"Plafond de {settings.daily_limit} histoires par jour atteint.")
+
+    band, user = story.brief(chosen, request.occasion, store.recent_titles(), date.today())
     try:
-        if history.count_today() >= settings.daily_limit:
-            raise HTTPException(429, f"Plafond de {settings.daily_limit} histoires par jour atteint.")
-        _check_printer()
-        theme = story.pick_theme(request.theme)
-        name = " ".join(request.prenom.split())
-        try:
-            written = story.write(theme, name, request.pronom,
-                                  key=settings.openrouter_key, model=settings.model)
-        except story.StoryError as exc:
-            raise HTTPException(502, str(exc)) from exc
-        try:
-            _print(written.title, written.paragraphs, name, request.rendu or settings.rendering)
-        except printer.PrinterError as exc:
-            raise HTTPException(503, str(exc)) from exc
-        entry = history.add(theme=theme, name=name, pronoun=request.pronom,
+        written = story.write(story.system_prompt(band), user, band,
+                              key=settings.openrouter_key, model=settings.model)
+    except story.StoryError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+    entry = store.add_story(children=[c["id"] for c in chosen], occasion=request.occasion,
                             title=written.title, paragraphs=written.paragraphs,
                             model=settings.model, words=written.words)
-        log.info("histoire %s imprimée : %s (%d mots)", entry.id, entry.title, entry.words)
-        return {**_summary(entry), "texte": written.text, "theme": theme}
-    finally:
-        busy.release()
+    log.info("histoire %s écrite : %s (%d mots, %s)", entry.id, entry.title, entry.words, band.label)
+    return _public(entry)
 
 
-@app.post("/api/reimprimer/{entry_id}")
-def reprint(entry_id: str) -> dict:
-    entry = history.find(entry_id)
+@app.post("/api/histoires/{story_id}/imprimer")
+def print_story(story_id: str) -> dict:
+    entry = store.story(story_id)
     if entry is None:
         raise HTTPException(404, "Histoire introuvable.")
-    if not busy.acquire(blocking=False):
-        raise HTTPException(409, "Une histoire est déjà en cours d'impression.")
+    if not printing.acquire(blocking=False):
+        raise HTTPException(409, "Un ticket est déjà en cours d'impression.")
     try:
-        _check_printer()
+        status = printer.status(settings.printer_host, settings.printer_port)
+        if not status.ready:
+            raise HTTPException(503, status.message)
+        image = ticket.render_raster(entry.title, tuple(entry.paragraphs),
+                                     _names(entry.children), date.fromisoformat(entry.created[:10]))
         try:
-            _print(entry.title, tuple(entry.paragraphs), entry.name, settings.rendering)
+            printer.print_image(settings.printer_host, settings.printer_port, image)
         except printer.PrinterError as exc:
             raise HTTPException(503, str(exc)) from exc
-        return _summary(entry)
+        store.mark_printed(entry.id)
+        return _public(store.story(entry.id))
     finally:
-        busy.release()
+        printing.release()
