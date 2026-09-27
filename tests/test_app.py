@@ -39,7 +39,9 @@ def _children(client, *profiles):
 
 
 def test_page_is_served(client):
-    assert "Miette" in client.get("/").text
+    response = client.get("/")
+    assert "Miette" in response.text
+    assert response.headers["cache-control"] == "no-cache"
 
 
 def test_profiles_get_ids_and_persist(client):

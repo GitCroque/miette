@@ -103,7 +103,9 @@ def _public(entry: StoredStory) -> dict:
 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+    # Revalider à chaque ouverture : sans cela, un téléphone peut garder l'ancienne page
+    # quelque temps après un déploiement (304 si rien n'a changé).
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
