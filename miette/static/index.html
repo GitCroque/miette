@@ -111,7 +111,7 @@
       .printer-card .state.warn { color: var(--warn-text); } .printer-card .state.warn::before { background: var(--warn); }
       .printer-card .state.bad { color: var(--bad-text); } .printer-card .state.bad::before { background: var(--bad); }
       .printer-card .remaining { font-size: 13px; color: var(--soft); font-weight: 600; }
-      main { padding: 40px 48px 56px; margin: 0; max-width: 1240px; }
+      main { padding: 40px 48px 56px; margin: 0 auto; max-width: 1240px; }
     }
 
     /* Éléments communs */
@@ -505,13 +505,13 @@
       html += '<div class="kids">';
       for (const child of kids) {
         const color = childColor(child.id);
-        html += `<button class="kid" data-action="surprise" data-ids="${esc(child.id)}">
+        html += `<button class="kid" data-action="surprise" data-ids="${esc(child.id)}" aria-label="Une histoire surprise pour ${esc(child.prenom)}">
           <span class="who"><span class="avatar" style="background:${color}">${initial(child.prenom)}</span>
           <span class="name"><b>${esc(child.prenom)}</b><small>${esc(child.age || "")}</small></span></span>
           <span class="surprise" style="background:${color}">${icon("sparkle", 16)}Surprise</span></button>`;
       }
       if (kids.length > 1) {
-        html += `<button class="kid together" data-action="surprise" data-ids="${esc(kids.map((c) => c.id).join(","))}">
+        html += `<button class="kid together" data-action="surprise" data-ids="${esc(kids.map((c) => c.id).join(","))}" aria-label="Une histoire surprise pour ${esc(namesOf(kids))}">
           <span class="who"><span class="avatars">${kids.slice(0, 3).map((c) => `<span class="avatar" style="background:${childColor(c.id)}">${initial(c.prenom)}</span>`).join("")}</span>
           <span class="name"><b>${esc(namesOf(kids))}</b><small>Ensemble</small></span></span>
           <span class="surprise">${icon("sparkle", 16)}Surprise</span></button>`;
@@ -543,7 +543,7 @@
       }
       html += `<div class="card favs"><div class="head"><span class="label" style="margin:0">Favoris</span><a href="#/historique">Historique</a></div>`;
       html += etat.favoris.length
-        ? etat.favoris.map((f) => `<a class="fav-link" href="#/histoire/${esc(f.id)}"><b>${esc(f.titre)}</b><small>${esc([f.pour, f.occasion ? etat.occasions[f.occasion] : ""].filter(Boolean).join(" · "))}</small></a>`).join("")
+        ? etat.favoris.map((f) => `<a class="fav-link" href="#/histoire/${esc(f.id)}" aria-label="${esc(f.titre + ", " + f.pour)}"><b>${esc(f.titre)}</b><small>${esc([f.pour, f.occasion ? etat.occasions[f.occasion] : ""].filter(Boolean).join(" · "))}</small></a>`).join("")
         : '<p class="empty" style="margin:0">Touche l\'étoile d\'une histoire pour la retrouver ici.</p>';
       html += "</div></section>";
 
@@ -580,7 +580,7 @@
       const recent = [], older = [];
       for (const item of items) (Date.now() - new Date(item.imprimee) < 7 * 86400000 ? recent : older).push(item);
       const group = (title, list) => !list.length ? "" : `<div class="group-label">${title}</div><div class="list">${list.map((item) => `
-        <div class="item${item.id === selectedId ? " selected" : ""}"><a href="#/histoire/${esc(item.id)}"${item.id === selectedId ? ' aria-current="true"' : ""}><b>${esc(item.titre)}</b><small>${esc(metaLine(item))}</small></a>
+        <div class="item${item.id === selectedId ? " selected" : ""}"><a href="#/histoire/${esc(item.id)}" aria-label="${esc(item.titre + ", " + metaLine(item))}"${item.id === selectedId ? ' aria-current="true"' : ""}><b>${esc(item.titre)}</b><small>${esc(metaLine(item))}</small></a>
         <button class="star" data-action="fav" data-id="${esc(item.id)}" aria-pressed="${item.favori}" aria-label="${item.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: item.favori })}</button></div>`).join("")}</div>`;
       return group("Cette semaine", recent) + group("Plus tôt", older);
     }
@@ -794,10 +794,18 @@
       const { view } = parse();
       return view === "" ? "accueil" : view === "histoire" ? "historique" : view;
     }
+    let previousSection = null;
     function route(scroll = true) {
       const { view, id } = parse();
       document.body.classList.toggle("focus", view === "apercu" || view === "histoire");
       const section = current();
+      // Arriver dans l'historique depuis un autre écran (« Relire » à l'accueil, un favori)
+      // repart de toutes les histoires : un filtre oublié y cachait l'histoire ouverte.
+      if (section === "historique" && previousSection !== "historique" && historyFilter !== "toutes") {
+        historyFilter = "toutes";
+        historyItems = null;
+      }
+      previousSection = section;
       document.querySelectorAll("[data-nav]").forEach((a) => {
         if (a.dataset.nav === section) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
       });
