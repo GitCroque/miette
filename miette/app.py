@@ -156,7 +156,7 @@ def _history(count: int, favorites_only: bool = False) -> list[dict]:
 
 
 def _picture(svg: str) -> Image.Image:
-    return drawing.render(svg, ticket.TEXT_WIDTH)
+    return drawing.trim(drawing.render(svg, ticket.TEXT_WIDTH))
 
 
 def _drawing_ticket(entry: StoredDrawing) -> Image.Image:

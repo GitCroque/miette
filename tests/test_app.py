@@ -244,7 +244,8 @@ def test_illustration_is_drawn_once_and_printed_with_the_story(client):
     assert len(client.prompts) == 1 and "Histoire 1" in client.prompts[0]
     assert client.get(f"/api/histoires/{story_id}/illustration.png").headers["content-type"] == "image/png"
     client.post(f"/api/histoires/{story_id}/imprimer")
-    assert client.printed[-1].height > plain + 400
+    # Le cercle de test, rogné, fait environ 376 points de haut.
+    assert client.printed[-1].height > plain + 350
 
 
 def test_a_failed_drawing_is_explained(client, monkeypatch):

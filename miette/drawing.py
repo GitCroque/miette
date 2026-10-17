@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 
 import anthropic
 import resvg_py
-from PIL import Image
+from PIL import Image, ImageOps
 
 from . import claude
 
@@ -160,6 +160,18 @@ def render(svg: str, width: int) -> Image.Image:
                                 skip_system_fonts=True)
     image = Image.open(io.BytesIO(bytes(png))).convert("L")
     return image.point(lambda v: 0 if v < THRESHOLD else 255, mode="1")
+
+
+def trim(image: Image.Image, padding: int = 12) -> Image.Image:
+    """Retire le blanc au-dessus et au-dessous du sujet, à quelques points près.
+
+    Le modèle dessine dans un carré : un sujet large et bas (le bus, le
+    train) laissait jusqu'à la moitié du carré vide, donc du papier perdu.
+    """
+    box = ImageOps.invert(image.convert("L")).getbbox()
+    if box is None:
+        return image
+    return image.crop((0, max(0, box[1] - padding), image.width, min(image.height, box[3] + padding)))
 
 
 def ink(image: Image.Image) -> float:

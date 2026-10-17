@@ -92,3 +92,12 @@ def test_a_theme_keeps_to_its_subjects():
     assert drawing.pick_subject([], "vehicules") in vehicles
     assert drawing.pick_subject(list(vehicles[:-1]), "vehicules") == vehicles[-1]
     assert len(set(drawing.SUBJECTS)) == len(drawing.SUBJECTS)
+
+
+def test_trim_drops_the_blank_above_and_below_a_wide_subject():
+    wide = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+            '<rect x="56" y="206" width="400" height="100" fill="none" stroke="#000" stroke-width="12"/></svg>')
+    image = drawing.render(wide, 484)
+    trimmed = drawing.trim(image)
+    assert trimmed.width == 484 and trimmed.height < 160
+    assert drawing.ink(trimmed) > drawing.ink(image)
