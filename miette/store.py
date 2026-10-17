@@ -47,16 +47,25 @@ CREATE TABLE IF NOT EXISTS dessins (
     sujet TEXT NOT NULL,
     svg TEXT,
     graine INTEGER,
-    imprime TEXT
+    imprime TEXT,
+    favori INTEGER NOT NULL DEFAULT 0,
+    supprime TEXT
 );
 """
 
-# Colonnes ajoutées après la première mise en service (2026-09-26) : une base
-# plus ancienne les reçoit à l'ouverture.
+# Colonnes ajoutées après la création de chaque table : une base plus ancienne
+# les reçoit à l'ouverture. Les dessins sont entrés dans l'historique le jour
+# même de leur mise en service (2026-10-17).
 LATER_COLUMNS = {
-    "favori": "INTEGER NOT NULL DEFAULT 0",
-    "supprimee": "TEXT",
-    "illustration": "TEXT",
+    "histoires": {
+        "favori": "INTEGER NOT NULL DEFAULT 0",
+        "supprimee": "TEXT",
+        "illustration": "TEXT",
+    },
+    "dessins": {
+        "favori": "INTEGER NOT NULL DEFAULT 0",
+        "supprime": "TEXT",
+    },
 }
 
 # Dessins écrits par Claude : ils coûtent comme une histoire et partagent son plafond.
@@ -87,6 +96,7 @@ class StoredDrawing:
     svg: str | None
     seed: int | None
     printed: str | None
+    favorite: bool = False
 
 
 class Store:
@@ -97,10 +107,11 @@ class Store:
         self._lock = threading.Lock()
         with self._lock:
             self._db.executescript(SCHEMA)
-            present = {row["name"] for row in self._db.execute("PRAGMA table_info(histoires)")}
-            for column, definition in LATER_COLUMNS.items():
-                if column not in present:
-                    self._db.execute(f"ALTER TABLE histoires ADD COLUMN {column} {definition}")
+            for table, columns in LATER_COLUMNS.items():
+                present = {row["name"] for row in self._db.execute(f"PRAGMA table_info({table})")}
+                for column, definition in columns.items():
+                    if column not in present:
+                        self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
             self._db.commit()
 
     # Fiches enfants
@@ -219,8 +230,31 @@ class Store:
 
     def drawing(self, drawing_id: str) -> StoredDrawing | None:
         with self._lock:
-            row = self._db.execute("SELECT * FROM dessins WHERE id = ?", (drawing_id,)).fetchone()
+            row = self._db.execute(
+                "SELECT * FROM dessins WHERE id = ? AND supprime IS NULL", (drawing_id,)
+            ).fetchone()
         return _drawing(row) if row else None
+
+    def printed_drawings(self, count: int = 5, favorites_only: bool = False) -> list[StoredDrawing]:
+        """Dessins et jeux imprimés, le dernier imprimé (ou réimprimé) en tête."""
+        where = "imprime IS NOT NULL AND supprime IS NULL" + (" AND favori = 1" if favorites_only else "")
+        with self._lock:
+            rows = self._db.execute(
+                f"SELECT * FROM dessins WHERE {where} ORDER BY imprime DESC LIMIT ?", (count,)
+            ).fetchall()
+        return [_drawing(r) for r in rows]
+
+    def set_drawing_favorite(self, drawing_id: str, favorite: bool) -> None:
+        with self._lock:
+            self._db.execute("UPDATE dessins SET favori = ? WHERE id = ?", (int(favorite), drawing_id))
+            self._db.commit()
+
+    def delete_drawing(self, drawing_id: str) -> None:
+        """Marque seulement : un coloriage supprimé reste compté dans le plafond du jour."""
+        with self._lock:
+            self._db.execute("UPDATE dessins SET supprime = ? WHERE id = ?",
+                             (datetime.now().isoformat(timespec="seconds"), drawing_id))
+            self._db.commit()
 
     def mark_drawing_printed(self, drawing_id: str) -> None:
         with self._lock:
@@ -251,5 +285,5 @@ def _story(row: sqlite3.Row) -> StoredStory:
 def _drawing(row: sqlite3.Row) -> StoredDrawing:
     return StoredDrawing(
         id=row["id"], created=row["cree"], kind=row["genre"], subject=row["sujet"],
-        svg=row["svg"], seed=row["graine"], printed=row["imprime"],
+        svg=row["svg"], seed=row["graine"], printed=row["imprime"], favorite=bool(row["favori"]),
     )

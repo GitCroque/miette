@@ -467,6 +467,11 @@
     function metaLine(story) {
       return [story.pour, story.occasion && etat ? etat.occasions[story.occasion] : "", whenLabel(story.imprimee || story.date)].filter(Boolean).join(" · ");
     }
+    function readerMeta(item) {
+      return [item.pour, longDate(item.imprimee || item.date), item.occasion && etat ? etat.occasions[item.occasion] : ""].filter(Boolean).join(" · ");
+    }
+    // L'historique mêle histoires et dessins : chaque action vise la bonne collection.
+    function apiBase(kind) { return kind === "dessin" ? "/api/dessins" : "/api/histoires"; }
     // Typographie française, comme sur le ticket : « ! » ou « » » ne commencent jamais une ligne.
     function typeset(text) { return text.replace(/ ([!?:;»])/g, "\u00a0$1").replace(/« /g, "«\u00a0"); }
     function paragraphs(text) { return text.split(/\n\s*\n/).map((p) => `<p>${esc(typeset(p))}</p>`).join(""); }
@@ -570,8 +575,8 @@
       }
       html += `<div class="card favs"><div class="head"><span class="label" style="margin:0">Favoris</span><a href="#/historique">Historique</a></div>`;
       html += etat.favoris.length
-        ? etat.favoris.map((f) => `<a class="fav-link" href="#/histoire/${esc(f.id)}" aria-label="${esc(f.titre + ", " + f.pour)}"><b>${esc(f.titre)}</b><small>${esc([f.pour, f.occasion ? etat.occasions[f.occasion] : ""].filter(Boolean).join(" · "))}</small></a>`).join("")
-        : '<p class="empty" style="margin:0">Touche l\'étoile d\'une histoire pour la retrouver ici.</p>';
+        ? etat.favoris.map((f) => `<a class="fav-link" href="#/histoire/${esc(f.id)}" aria-label="${esc([f.titre, f.pour].filter(Boolean).join(", "))}"><b>${esc(f.titre)}</b><small>${esc(f.type === "dessin" ? etat.activites[f.genre] : [f.pour, f.occasion ? etat.occasions[f.occasion] : ""].filter(Boolean).join(" · "))}</small></a>`).join("")
+        : '<p class="empty" style="margin:0">Touche l\'étoile d\'une histoire ou d\'un dessin pour le retrouver ici.</p>';
       html += "</div></section>";
 
       if (!etat.cle) html += '<p class="notice">Clé Anthropic absente : aucune histoire ne peut être écrite.</p>';
@@ -636,28 +641,28 @@
     // Historique et lecture
 
     async function loadHistory() {
-      historyItems = await api("GET", "/api/histoires" + (historyFilter === "favoris" ? "?favoris=true" : ""));
+      historyItems = await api("GET", "/api/historique" + (historyFilter === "favoris" ? "?favoris=true" : ""));
       return historyItems;
     }
     function listHtml(items, selectedId) {
       if (!items.length) {
-        return `<div class="card" style="margin-top:12px"><p class="empty" style="margin:0">${historyFilter === "favoris" ? "Aucun favori : touche l'étoile d'une histoire pour la retrouver ici." : "Aucune histoire imprimée pour l'instant."}</p></div>`;
+        return `<div class="card" style="margin-top:12px"><p class="empty" style="margin:0">${historyFilter === "favoris" ? "Aucun favori : touche l'étoile d'une histoire ou d'un dessin pour le retrouver ici." : "Rien d'imprimé pour l'instant."}</p></div>`;
       }
       const recent = [], older = [];
       for (const item of items) (Date.now() - new Date(item.imprimee) < 7 * 86400000 ? recent : older).push(item);
       const group = (title, list) => !list.length ? "" : `<div class="group-label">${title}</div><div class="list">${list.map((item) => `
         <div class="item${item.id === selectedId ? " selected" : ""}"><a href="#/histoire/${esc(item.id)}" aria-label="${esc(item.titre + ", " + metaLine(item))}"${item.id === selectedId ? ' aria-current="true"' : ""}><b>${esc(item.titre)}</b><small>${esc(metaLine(item))}</small></a>
-        <button class="star" data-action="fav" data-id="${esc(item.id)}" aria-pressed="${item.favori}" aria-label="${item.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: item.favori })}</button></div>`).join("")}</div>`;
+        <button class="star" data-action="fav" data-id="${esc(item.id)}" data-kind="${esc(item.type)}" aria-pressed="${item.favori}" aria-label="${item.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: item.favori })}</button></div>`).join("")}</div>`;
       return group("Cette semaine", recent) + group("Plus tôt", older);
     }
     function listPane(items, selectedId) {
-      return `<div class="hist-head"><h1 class="big">Historique</h1><span class="count">${items.length} histoire${items.length > 1 ? "s" : ""}</span></div>
+      return `<div class="hist-head"><h1 class="big">Historique</h1><span class="count">${items.length} ticket${items.length > 1 ? "s" : ""}</span></div>
         <div class="seg" role="group" aria-label="Filtre"><button data-action="filter" data-filter="toutes" aria-pressed="${historyFilter === "toutes"}">Toutes</button>
         <button data-action="filter" data-filter="favoris" aria-pressed="${historyFilter === "favoris"}">${icon("star", 16)}Favoris</button></div>${listHtml(items, selectedId)}`;
     }
     function readerTools(story, round) {
       const cls = round ? "round star" : "btn icon-only star";
-      return `<button class="${cls}" data-action="fav" data-id="${esc(story.id)}" aria-pressed="${story.favori}" aria-label="${story.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: story.favori })}</button>`;
+      return `<button class="${cls}" data-action="fav" data-id="${esc(story.id)}" data-kind="${esc(story.type)}" aria-pressed="${story.favori}" aria-label="${story.favori ? "Retirer des favoris" : "Ajouter aux favoris"}">${icon("star", 22, { fill: story.favori })}</button>`;
     }
 
     async function renderHistory(selectedId) {
@@ -672,14 +677,20 @@
         view.innerHTML = listPane(items, null);
         return;
       }
-      const selected = items.find((i) => i.id === selectedId) || (selectedId ? await api("GET", `/api/histoires/${selectedId}`).catch(() => null) : null) || items[0];
+      const selected = items.find((i) => i.id === selectedId) || (selectedId ? await api("GET", `/api/historique/${selectedId}`).catch(() => null) : null) || items[0];
       view.className = "wide-history";
       view.innerHTML = `<div class="hist-layout"><section class="hist-list">${listPane(items, selected && selected.id)}</section>
-        <article class="hist-reader">${selected ? `<div class="top"><div><div class="reader-meta">${esc(selected.pour)} · ${esc(longDate(selected.imprimee || selected.date))}${selected.occasion ? " · " + esc(etat.occasions[selected.occasion]) : ""}</div>
+        <article class="hist-reader">${selected ? `<div class="top"><div><div class="reader-meta">${esc(readerMeta(selected))}</div>
           <h2 class="story-title">${esc(selected.titre)}</h2></div><div class="tools">${readerTools(selected, false)}
-          <button class="btn icon-only danger" data-action="delete" data-id="${esc(selected.id)}" aria-label="Supprimer l'histoire">${icon("trash", 20)}</button>
-          <button class="btn dark" data-action="reprint" data-id="${esc(selected.id)}">${icon("printer", 18)}Réimprimer</button></div></div>
-          ${pictureHtml(selected)}<div class="story">${paragraphs(selected.texte)}</div>` : '<p class="empty">Choisis une histoire à gauche.</p>'}</article></div>`;
+          <button class="btn icon-only danger" data-action="delete" data-id="${esc(selected.id)}" data-kind="${esc(selected.type)}" aria-label="Supprimer">${icon("trash", 20)}</button>
+          <button class="btn dark" data-action="reprint" data-id="${esc(selected.id)}" data-kind="${esc(selected.type)}">${icon("printer", 18)}Réimprimer</button></div></div>
+          ${body(selected)}` : '<p class="empty">Choisis une histoire ou un dessin à gauche.</p>'}</article></div>`;
+    }
+
+    // Corps d'une entrée de l'historique : l'illustration et le texte d'une histoire, ou le ticket d'un dessin.
+    function body(item) {
+      if (item.type === "dessin") return `<img class="ticket-img" src="/api/dessins/${esc(item.id)}.png" alt="${esc(item.titre)}">`;
+      return `${pictureHtml(item)}<div class="story">${paragraphs(item.texte)}</div>`;
     }
 
     async function renderStory(id) {
@@ -688,13 +699,13 @@
       let story = historyItems && historyItems.find((i) => i.id === id);
       if (!story) {
         view.innerHTML = '<p class="empty">Chargement…</p>';
-        try { story = await api("GET", `/api/histoires/${id}`); } catch (error) { view.innerHTML = `<p class="empty">${esc(error.message)}</p><a class="btn" href="#/historique">Historique</a>`; return; }
+        try { story = await api("GET", `/api/historique/${id}`); } catch (error) { view.innerHTML = `<p class="empty">${esc(error.message)}</p><a class="btn" href="#/historique">Historique</a>`; return; }
       }
       view.innerHTML = `<div class="view-head"><a class="back" href="#/historique">${icon("back", 20)}Historique</a>${readerTools(story, true)}</div>
-        <article class="reader"><div class="reader-meta">${esc(story.pour)} · ${esc(longDate(story.imprimee || story.date))}${story.occasion ? " · " + esc(etat.occasions[story.occasion]) : ""}</div>
-        ${pictureHtml(story)}<h1 class="story-title">${esc(story.titre)}</h1><div class="story">${paragraphs(story.texte)}</div></article>
-        <div class="actionbar" style="max-width:700px"><button class="btn big-btn danger" data-action="delete" data-id="${esc(story.id)}" aria-label="Supprimer l'histoire">${icon("trash", 18)}<span class="lbl">Supprimer</span></button>
-        <button class="btn big-btn dark grow" data-action="reprint" data-id="${esc(story.id)}">${icon("printer", 20)}Réimprimer</button></div>`;
+        <article class="reader"><div class="reader-meta">${esc(readerMeta(story))}</div>
+        <h1 class="story-title">${esc(story.titre)}</h1>${body(story)}</article>
+        <div class="actionbar" style="max-width:700px"><button class="btn big-btn danger" data-action="delete" data-id="${esc(story.id)}" data-kind="${esc(story.type)}" aria-label="Supprimer">${icon("trash", 18)}<span class="lbl">Supprimer</span></button>
+        <button class="btn big-btn dark grow" data-action="reprint" data-id="${esc(story.id)}" data-kind="${esc(story.type)}">${icon("printer", 20)}Réimprimer</button></div>`;
     }
 
     // Réglages
@@ -755,12 +766,12 @@
       }
     }
 
-    async function print(id, fromDraft) {
+    async function print(id, fromDraft, kind = "histoire") {
       if (busy) return;
       setBusy(true, "Impression…");
       try {
-        const story = await api("POST", `/api/histoires/${id}/imprimer`);
-        toast(fromDraft ? "Imprimée" : "Réimprimée");
+        const story = await api("POST", `${apiBase(kind)}/${id}/imprimer`);
+        toast(kind === "dessin" ? "Réimprimé" : fromDraft ? "Imprimée" : "Réimprimée");
         historyItems = null;
         await refreshState();
         if (fromDraft) {
@@ -803,8 +814,9 @@
         toast("Imprimé");
         drawingDraft = null;
         session.set("miette.dessin", null);
+        historyItems = null;
         await refreshState();
-        location.hash = "#/";
+        location.hash = `#/histoire/${id}`;
       } catch (error) {
         toast(error.message, true);
       } finally {
@@ -815,13 +827,13 @@
     async function toggleFavorite(id, button) {
       const next = button.getAttribute("aria-pressed") !== "true";
       try {
-        const story = await api("POST", `/api/histoires/${id}/favori`, { favori: next });
+        const story = await api("POST", `${apiBase(button.dataset.kind)}/${id}/favori`, { favori: next });
         if (historyItems) {
           const index = historyItems.findIndex((i) => i.id === id);
           if (index >= 0) historyItems[index] = story;
           if (historyFilter === "favoris" && !next) historyItems = historyItems.filter((i) => i.id !== id);
         }
-        toast(next ? "Ajoutée aux favoris" : "Retirée des favoris");
+        toast(next ? "Ajouté aux favoris" : "Retiré des favoris");
         refreshState();
         route(false);
       } catch (error) {
@@ -829,12 +841,12 @@
       }
     }
 
-    async function remove(id) {
+    async function remove(id, kind) {
       const story = (historyItems || []).find((i) => i.id === id);
-      if (!confirm(`Supprimer « ${story ? story.titre : "cette histoire"} » ? Elle disparaîtra de l'historique.`)) return;
+      if (!confirm(`Supprimer « ${story ? story.titre : "ce ticket"} » ? Il disparaîtra de l'historique.`)) return;
       try {
-        await api("DELETE", `/api/histoires/${id}`);
-        toast("Supprimée");
+        await api("DELETE", `${apiBase(kind)}/${id}`);
+        toast("Supprimé");
         historyItems = null;
         await refreshState();
         if (location.hash === "#/historique") route(false); else location.hash = "#/historique";
@@ -875,9 +887,9 @@
       else if (action === "another-drawing") { if (lastDrawingRequest) makeDrawing(lastDrawingRequest); }
       else if (action === "maze-level") makeDrawing({ genre: "labyrinthe", niveau: target.dataset.level });
       else if (action === "print-drawing") printDrawing(id);
-      else if (action === "reprint") print(id, false);
+      else if (action === "reprint") print(id, false, target.dataset.kind);
       else if (action === "fav") toggleFavorite(id, target);
-      else if (action === "delete") remove(id);
+      else if (action === "delete") remove(id, target.dataset.kind);
       else if (action === "filter") { historyFilter = target.dataset.filter; historyItems = null; route(false); }
       else if (action === "add-child") { settingsDrafts.push({ accord: "elle" }); renderSettingsForms(); }
       else if (action === "remove-child") { settingsDrafts.splice(Number(index), 1); renderSettingsForms(); }

@@ -191,11 +191,11 @@ def test_printing_always_checks_the_printer_again(client, monkeypatch):
 
 def test_coloring_preview_then_print(client):
     data = client.post("/api/dessins", json={"genre": "coloriage"}).json()
-    assert data["sujet"] in drawing.SUBJECTS and data["imprime"] is None
+    assert data["sujet"] in drawing.SUBJECTS and data["imprimee"] is None
     assert "Coloriage" in client.prompts[0]
     assert client.get(f"/api/dessins/{data['id']}.png").headers["content-type"] == "image/png"
     assert client.printed == []
-    assert client.post(f"/api/dessins/{data['id']}/imprimer").json()["imprime"]
+    assert client.post(f"/api/dessins/{data['id']}/imprimer").json()["imprimee"]
     assert len(client.printed) == 1 and client.printed[0].width == 512
 
 
@@ -251,3 +251,38 @@ def test_a_failed_drawing_is_explained(client, monkeypatch):
     monkeypatch.setattr(drawing, "draw", fail)
     response = client.post("/api/dessins", json={"genre": "imagier"})
     assert response.status_code == 502 and "vide" in response.json()["detail"]
+
+
+def _printed_drawing(client, genre):
+    drawing_id = client.post("/api/dessins", json={"genre": genre}).json()["id"]
+    assert client.post(f"/api/dessins/{drawing_id}/imprimer").status_code == 200
+    return drawing_id
+
+
+def test_history_mixes_stories_and_drawings_by_print_time(client):
+    lou, = _children(client, LOU)
+    story_id = _printed(client, lou)
+    maze_id = _printed_drawing(client, "labyrinthe")
+    client.post("/api/dessins", json={"genre": "coloriage"})  # aperçu écarté, jamais imprimé
+    client.post(f"/api/histoires/{story_id}/imprimer")  # réimprimée : repasse en tête
+    items = client.get("/api/historique").json()
+    assert [(i["type"], i["id"]) for i in items] == [("histoire", story_id), ("dessin", maze_id)]
+    assert client.get(f"/api/historique/{maze_id}").json()["genre"] == "labyrinthe"
+    assert client.get(f"/api/historique/{story_id}").json()["type"] == "histoire"
+    assert client.get("/api/historique/inconnu").status_code == 404
+
+
+def test_drawing_favorites_reach_the_home_page(client):
+    maze_id = _printed_drawing(client, "labyrinthe")
+    assert client.post(f"/api/dessins/{maze_id}/favori", json={"favori": True}).json()["favori"] is True
+    assert [i["id"] for i in client.get("/api/historique?favoris=true").json()] == [maze_id]
+    assert [f["id"] for f in client.get("/api/etat").json()["favoris"]] == [maze_id]
+
+
+def test_deleted_drawing_leaves_the_history_but_keeps_the_daily_count(client):
+    coloring_id = _printed_drawing(client, "coloriage")
+    assert client.delete(f"/api/dessins/{coloring_id}").status_code == 200
+    assert client.get("/api/historique").json() == []
+    assert client.get(f"/api/dessins/{coloring_id}.png").status_code == 404
+    assert client.post(f"/api/dessins/{coloring_id}/imprimer").status_code == 404
+    assert client.get("/api/etat").json()["restantes"] == 2

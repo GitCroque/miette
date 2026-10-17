@@ -47,3 +47,22 @@ def test_illustrations_and_drawings(tmp_path):
     store.mark_drawing_printed(coloring.id)
     assert store.drawing(coloring.id).printed
     assert store.drawing("inconnu") is None
+
+
+def test_the_first_drawings_table_is_migrated(tmp_path):
+    db = sqlite3.connect(tmp_path / "miette.db")
+    db.executescript("""
+    CREATE TABLE dessins (id TEXT PRIMARY KEY, cree TEXT NOT NULL, genre TEXT NOT NULL,
+        sujet TEXT NOT NULL, svg TEXT, graine INTEGER, imprime TEXT);
+    INSERT INTO dessins VALUES ('d1', '2026-10-17T10:30:00', 'labyrinthe', 'facile', NULL, 4,
+        '2026-10-17T10:31:00');
+    """)
+    db.commit()
+    db.close()
+
+    store = Store(tmp_path)
+    assert store.drawing("d1").favorite is False
+    store.set_drawing_favorite("d1", True)
+    assert [d.id for d in store.printed_drawings(favorites_only=True)] == ["d1"]
+    store.delete_drawing("d1")
+    assert store.drawing("d1") is None and store.printed_drawings() == []

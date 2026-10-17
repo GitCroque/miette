@@ -113,6 +113,7 @@ def _names(ids: list[str]) -> str:
 
 def _public(entry: StoredStory) -> dict:
     return {
+        "type": "histoire",
         "id": entry.id,
         "titre": entry.title,
         "texte": "\n\n".join(entry.paragraphs),
@@ -133,13 +134,23 @@ def _drawing_title(entry: StoredDrawing) -> str:
 
 def _public_drawing(entry: StoredDrawing) -> dict:
     return {
+        "type": "dessin",
         "id": entry.id,
         "genre": entry.kind,
         "sujet": entry.subject,
         "titre": _drawing_title(entry),
         "date": entry.created,
-        "imprime": entry.printed,
+        "imprimee": entry.printed,
+        "favori": entry.favorite,
     }
+
+
+def _history(count: int, favorites_only: bool = False) -> list[dict]:
+    """Histoires, dessins et jeux imprimés, mêlés, le dernier imprimé en tête."""
+    items = [_public(e) for e in store.printed(count, favorites_only)]
+    items += [_public_drawing(e) for e in store.printed_drawings(count, favorites_only)]
+    items.sort(key=lambda item: item["imprimee"], reverse=True)
+    return items[:count]
 
 
 def _picture(svg: str) -> Image.Image:
@@ -228,7 +239,7 @@ def state() -> dict:
         "activites": ACTIVITIES,
         "niveaux": MAZE_LEVELS,
         "derniere": _public(last[0]) if last else None,
-        "favoris": [_public(e) for e in store.printed(3, favorites_only=True)],
+        "favoris": _history(3, favorites_only=True),
     }
 
 
@@ -242,6 +253,21 @@ def save_children(children: list[Child]) -> list[dict]:
     if len(children) > MAX_CHILDREN:
         raise HTTPException(422, f"{MAX_CHILDREN} fiches au plus.")
     return store.save_children([c.model_dump() for c in children])
+
+
+@app.get("/api/historique")
+def history(favoris: bool = False) -> list[dict]:
+    """L'historique : tout ce qui est sorti de l'imprimante, jamais les aperçus écartés."""
+    return _history(500, favorites_only=favoris)
+
+
+@app.get("/api/historique/{item_id}")
+def history_item(item_id: str) -> dict:
+    if (entry := store.story(item_id)) is not None:
+        return _public(entry)
+    if (drawn := store.drawing(item_id)) is not None:
+        return _public_drawing(drawn)
+    raise HTTPException(404, "Introuvable dans l'historique.")
 
 
 @app.get("/api/histoires")
@@ -367,6 +393,30 @@ def drawing_image(drawing_id: str) -> Response:
     if entry is None:
         raise HTTPException(404, "Dessin introuvable.")
     return _png(_drawing_ticket(entry), "private, max-age=604800, immutable")
+
+
+@app.get("/api/dessins/{drawing_id}")
+def read_drawing(drawing_id: str) -> dict:
+    entry = store.drawing(drawing_id)
+    if entry is None:
+        raise HTTPException(404, "Dessin introuvable.")
+    return _public_drawing(entry)
+
+
+@app.post("/api/dessins/{drawing_id}/favori")
+def set_drawing_favorite(drawing_id: str, body: Favorite) -> dict:
+    if store.drawing(drawing_id) is None:
+        raise HTTPException(404, "Dessin introuvable.")
+    store.set_drawing_favorite(drawing_id, body.favori)
+    return _public_drawing(store.drawing(drawing_id))
+
+
+@app.delete("/api/dessins/{drawing_id}")
+def delete_drawing(drawing_id: str) -> dict:
+    if store.drawing(drawing_id) is None:
+        raise HTTPException(404, "Dessin introuvable.")
+    store.delete_drawing(drawing_id)
+    return {"ok": True}
 
 
 @app.post("/api/dessins/{drawing_id}/imprimer")
