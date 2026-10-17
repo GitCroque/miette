@@ -18,6 +18,8 @@ from datetime import date
 
 import anthropic
 
+from . import claude
+
 SITUATIONS = (
     "l'heure du bain", "le repas", "l'heure de la sieste", "le coucher", "la crèche",
     "le parc", "s'habiller pour sortir", "les courses", "le jardin", "une promenade sous la pluie",
@@ -190,8 +192,8 @@ def brief(children: list[dict], occasion: str | None, recent_titles: list[str],
     return band, "\n".join(lines)
 
 
-class StoryError(Exception):
-    """Échec compréhensible par un humain, affiché tel quel sur le téléphone."""
+class StoryError(claude.ClaudeError):
+    """Histoire inutilisable : réponse vide ou hors du format attendu."""
 
 
 @dataclass(frozen=True)
@@ -245,38 +247,17 @@ def parse(raw: str) -> Story:
     return Story(title=title, paragraphs=tuple(paragraphs))
 
 
-def _complete(payload: dict, client: anthropic.Anthropic) -> str:
-    try:
-        message = client.beta.messages.create(**payload)
-    except anthropic.AuthenticationError as exc:
-        raise StoryError("Clé Anthropic refusée (ANTHROPIC_API_KEY) : à renouveler.") from exc
-    except anthropic.RateLimitError as exc:
-        raise StoryError("Anthropic demande de patienter, réessayer dans un instant.") from exc
-    except anthropic.APIStatusError as exc:
-        if exc.status_code == 402:
-            raise StoryError("Crédit Anthropic épuisé ou plafond de dépense atteint.") from exc
-        raise StoryError(f"Anthropic a répondu {exc.status_code}.") from exc
-    except anthropic.APIConnectionError as exc:
-        raise StoryError(f"Anthropic injoignable : {type(exc).__name__}.") from exc
-
-    if message.stop_reason == "refusal":
-        raise StoryError("Le modèle a refusé d'écrire cette histoire, réessayer.")
-    return "".join(block.text for block in message.content if block.type == "text")
-
-
 def write(system: str, user: str, band: Band, *, key: str, model: str,
           client: anthropic.Anthropic | None = None) -> Story:
     """Demande une histoire, et la redemande une fois si elle est vide ou hors longueur."""
-    if not key:
-        raise StoryError("Aucune clé Anthropic : renseigner ANTHROPIC_API_KEY.")
     payload = build_request(system, user, model)
     low, high = round(band.min_words * 0.7), round(band.max_words * 1.3)
     owned = client is None
-    client = client or anthropic.Anthropic(api_key=key, timeout=60, max_retries=1)
+    client = client or claude.client(key)
     try:
         story = None
         for _ in range(2):
-            raw = _complete(payload, client)
+            raw = claude.complete(payload, client)
             if not raw.strip():
                 continue
             story = parse(raw)

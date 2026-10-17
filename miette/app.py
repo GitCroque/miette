@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, printer, story, ticket
+from . import claude, config, printer, story, ticket
 from .store import Store, StoredStory
 
 STATIC = Path(__file__).parent / "static"
@@ -198,7 +198,7 @@ def write_story(request: StoryRequest) -> dict:
     try:
         written = story.write(story.system_prompt(band), user, band,
                               key=settings.anthropic_key, model=settings.model)
-    except story.StoryError as exc:
+    except claude.ClaudeError as exc:
         raise HTTPException(502, str(exc)) from exc
 
     entry = store.add_story(children=[c["id"] for c in chosen], occasion=request.occasion,

@@ -5,7 +5,7 @@ import anthropic
 import httpx2
 import pytest
 
-from miette import story
+from miette import claude, story
 
 TODAY = date(2026, 11, 15)
 LOU = {"id": "a", "prenom": "Lou", "naissance": "2024-10", "accord": "elle",
@@ -137,17 +137,17 @@ def test_write_gives_up_after_two_empty_answers():
 
 def test_write_explains_a_refused_key():
     refused = httpx2.Response(401, json={"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}})
-    with pytest.raises(story.StoryError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(claude.ClaudeError, match="ANTHROPIC_API_KEY"):
         story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: refused))
 
 
 def test_write_explains_a_refusal():
-    with pytest.raises(story.StoryError, match="refusé"):
+    with pytest.raises(claude.ClaudeError, match="refusé"):
         story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: _answer("", "refusal")))
 
 
 def test_write_without_key():
-    with pytest.raises(story.StoryError, match="Aucune clé"):
+    with pytest.raises(claude.ClaudeError, match="Aucune clé"):
         story.write("s", "u", BAND, key="", model="m")
 
 
