@@ -40,6 +40,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(drawing, "draw", fake_draw)
     test_client = TestClient(app_module.app)
     test_client.printed, test_client.briefs, test_client.prompts = printed, briefs, prompts
+    test_client.store = app_module.store
     return test_client
 
 
@@ -219,7 +220,7 @@ def test_drawings_share_the_daily_limit_with_stories(client):
     lou, = _children(client, LOU)
     client.post("/api/histoires", json={"enfants": [lou]})
     client.post("/api/dessins", json={"genre": "coloriage"})
-    client.post("/api/dessins", json={"genre": "imagier"})
+    client.post("/api/dessins", json={"genre": "coloriage", "categorie": "animaux"})
     assert client.post("/api/dessins", json={"genre": "coloriage"}).status_code == 429
     assert client.post("/api/histoires", json={"enfants": [lou]}).status_code == 429
     assert client.post("/api/dessins", json={"genre": "labyrinthe"}).status_code == 200
@@ -227,6 +228,8 @@ def test_drawings_share_the_daily_limit_with_stories(client):
 
 def test_unknown_activity_is_rejected(client):
     assert client.post("/api/dessins", json={"genre": "sudoku"}).status_code == 422
+    assert client.post("/api/dessins", json={"genre": "imagier"}).status_code == 422
+    assert client.post("/api/dessins", json={"genre": "coloriage", "categorie": "dinosaures"}).status_code == 422
     assert client.post("/api/dessins", json={"genre": "labyrinthe", "niveau": "géant"}).status_code == 422
 
 
@@ -249,7 +252,7 @@ def test_a_failed_drawing_is_explained(client, monkeypatch):
         raise drawing.DrawingError("Le dessin reçu est vide. Réessayer dans un instant.")
 
     monkeypatch.setattr(drawing, "draw", fail)
-    response = client.post("/api/dessins", json={"genre": "imagier"})
+    response = client.post("/api/dessins", json={"genre": "coloriage"})
     assert response.status_code == 502 and "vide" in response.json()["detail"]
 
 
@@ -286,3 +289,18 @@ def test_deleted_drawing_leaves_the_history_but_keeps_the_daily_count(client):
     assert client.get(f"/api/dessins/{coloring_id}.png").status_code == 404
     assert client.post(f"/api/dessins/{coloring_id}/imprimer").status_code == 404
     assert client.get("/api/etat").json()["restantes"] == 2
+
+
+def test_coloring_keeps_to_the_chosen_theme(client):
+    _, vehicles = drawing.CATEGORIES["vehicules"]
+    data = client.post("/api/dessins", json={"genre": "coloriage", "categorie": "vehicules"}).json()
+    assert data["sujet"] in vehicles and data["titre"] == f"Coloriage : {data['sujet']}"
+    assert set(client.get("/api/etat").json()["categories"]) == set(drawing.CATEGORIES)
+
+
+def test_picture_book_pages_printed_before_the_merge_still_show(client):
+    old = client.store.add_drawing(kind="imagier", subject="la vache", svg=CIRCLE)
+    client.store.mark_drawing_printed(old.id)
+    item = client.get("/api/historique").json()[0]
+    assert item["titre"] == "Imagier : la vache"
+    assert client.get(f"/api/dessins/{old.id}.png").status_code == 200

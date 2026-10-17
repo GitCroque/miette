@@ -163,18 +163,8 @@ def render_raster(title: str, paragraphs: tuple[str, ...], name: str,
     return page.finish()
 
 
-def render_coloring(picture: Image.Image, day: date) -> Image.Image:
-    page = _Page()
-    page.space(6)
-    page.line("À colorier", font(ROUNDED, 34, 600), 44, center=True)
-    page.space(10)
-    page.picture(picture)
-    _footer(page, day)
-    return page.finish()
-
-
-def render_picture_book(picture: Image.Image, subject: str, day: date) -> Image.Image:
-    """Une page d'imagier : le dessin, puis son nom en grand pour le dire ensemble."""
+def render_coloring(picture: Image.Image, subject: str, day: date) -> Image.Image:
+    """Un coloriage qui sert aussi d'imagier : le dessin, puis son nom en grand pour le dire ensemble."""
     page = _Page()
     page.space(6)
     page.picture(picture)

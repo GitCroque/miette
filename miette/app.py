@@ -2,9 +2,9 @@
 
 Déroulé décidé le 2026-09-26 : choisir l'enfant (ou les deux), Surprise ou
 une occasion, lire l'aperçu, puis imprimer ou en demander une autre. Depuis le
-2026-10-17, même déroulé pour les dessins (coloriage, imagier) et les jeux
-(labyrinthe, points à relier, cherche et trouve), et chaque histoire peut
-recevoir son illustration.
+2026-10-17, même déroulé pour les coloriages (par thème, avec le nom du sujet
+en grand : l'ancien imagier y est fondu) et les jeux (labyrinthe, points à
+relier, cherche et trouve), et chaque histoire peut recevoir son illustration.
 """
 
 from __future__ import annotations
@@ -35,11 +35,12 @@ MAX_CHILDREN = 6
 
 ACTIVITIES = {
     "coloriage": "Coloriage",
-    "imagier": "Imagier",
     "labyrinthe": "Labyrinthe",
     "points": "Points à relier",
     "cherche": "Cherche et trouve",
 }
+# Les imagiers imprimés avant leur fusion dans le coloriage gardent leur nom.
+KIND_LABELS = {**ACTIVITIES, "imagier": "Imagier"}
 # Le plus simple d'abord : les enfants ont 2 ans à l'automne 2026.
 MAZE_LEVELS = list(maze.LEVELS)
 
@@ -98,8 +99,9 @@ class StoryRequest(BaseModel):
 
 
 class DrawingRequest(BaseModel):
-    genre: Literal["coloriage", "imagier", "labyrinthe", "points", "cherche"]
+    genre: Literal["coloriage", "labyrinthe", "points", "cherche"]
     niveau: Literal["tout-petit", "facile", "moyen", "costaud"] | None = None
+    categorie: Literal["animaux", "vehicules", "maison", "nature", "a-manger"] | None = None
 
 
 def _names(ids: list[str]) -> str:
@@ -129,7 +131,7 @@ def _public(entry: StoredStory) -> dict:
 def _drawing_title(entry: StoredDrawing) -> str:
     if entry.kind == "labyrinthe":
         return f"Labyrinthe {entry.subject}"
-    return f"{ACTIVITIES[entry.kind]} : {entry.subject}"
+    return f"{KIND_LABELS[entry.kind]} : {entry.subject}"
 
 
 def _public_drawing(entry: StoredDrawing) -> dict:
@@ -160,10 +162,8 @@ def _picture(svg: str) -> Image.Image:
 def _drawing_ticket(entry: StoredDrawing) -> Image.Image:
     """Le ticket complet, recomposé à l'identique pour l'aperçu comme pour l'impression."""
     day = date.fromisoformat(entry.created[:10])
-    if entry.kind == "coloriage":
-        return ticket.render_coloring(_picture(entry.svg), day)
-    if entry.kind == "imagier":
-        return ticket.render_picture_book(_picture(entry.svg), entry.subject, day)
+    if entry.kind in ("coloriage", "imagier"):
+        return ticket.render_coloring(_picture(entry.svg), entry.subject, day)
     if entry.kind == "labyrinthe":
         sheet = maze.render(entry.subject, seed=entry.seed)
     elif entry.kind == "points":
@@ -237,6 +237,7 @@ def state() -> dict:
                     for c in store.children()],
         "occasions": story.OCCASIONS,
         "activites": ACTIVITIES,
+        "categories": {key: label for key, (label, _) in drawing.CATEGORIES.items()},
         "niveaux": MAZE_LEVELS,
         "derniere": _public(last[0]) if last else None,
         "favoris": _history(3, favorites_only=True),
@@ -366,12 +367,11 @@ def make_drawing(request: DrawingRequest) -> dict:
     """Prépare un dessin ou un jeu en aperçu, sans l'imprimer."""
     kind = request.genre
     rng = random.Random()
-    if kind in ("coloriage", "imagier"):
+    if kind == "coloriage":
         _check_daily_limit()
-        subject = drawing.pick_subject(store.recent_subjects(("coloriage", "imagier")), rng)
-        prompt = drawing.coloring_prompt(subject) if kind == "coloriage" else drawing.picture_prompt(subject)
+        subject = drawing.pick_subject(store.recent_subjects(("coloriage", "imagier")), request.categorie, rng)
         try:
-            svg = drawing.draw(prompt, key=settings.anthropic_key, model=settings.model)
+            svg = drawing.draw(drawing.coloring_prompt(subject), key=settings.anthropic_key, model=settings.model)
         except claude.ClaudeError as exc:
             raise HTTPException(502, str(exc)) from exc
         entry = store.add_drawing(kind=kind, subject=subject, svg=svg)

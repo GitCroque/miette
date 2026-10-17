@@ -84,3 +84,11 @@ def test_noun_drops_the_article():
     assert drawing.noun("l'éléphant") == "éléphant"
     assert drawing.noun("la vache") == "vache"
     assert "chat" in drawing.coloring_prompt("le chat")
+
+
+def test_a_theme_keeps_to_its_subjects():
+    label, vehicles = drawing.CATEGORIES["vehicules"]
+    assert label == "Véhicules"
+    assert drawing.pick_subject([], "vehicules") in vehicles
+    assert drawing.pick_subject(list(vehicles[:-1]), "vehicules") == vehicles[-1]
+    assert len(set(drawing.SUBJECTS)) == len(drawing.SUBJECTS)

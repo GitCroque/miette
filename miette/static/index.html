@@ -196,11 +196,10 @@
     .occ[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
     .occ-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding: 12px; border-radius: 16px; background: var(--paper-2); }
     .occ-pick .q { font-weight: 800; font-size: 15px; margin-right: 4px; }
-    .pick { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; color: #FFFFFF; font-weight: 800; font-size: 15px; }
+    .pick { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; color: #FFFFFF; font-weight: 800; font-size: 15px; }
     .pick.together { background: var(--inverse-bg); color: var(--inverse-ink); }
     @media (min-width: 700px) {
       .occ-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; overflow: visible; }
-      .occ-row.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
       .occ { flex-direction: column; align-items: flex-start; justify-content: space-between; height: 104px; padding: 16px; border-radius: 20px; font-size: 16px; font-weight: 800; text-align: left; }
       .occ svg { width: 28px; height: 28px; }
     }
@@ -410,6 +409,7 @@
     let illustrating = null;
     const illustrationTried = new Set();
     let pendingOccasion = null;
+    let pendingColoring = false;
     let historyItems = null;
     let historyFilter = "toutes";
     let settingsDrafts = [];
@@ -557,11 +557,18 @@
       }
       html += "</section>";
 
-      html += '<section class="activities"><h2 class="label">À dessiner et à jouer</h2><div class="occ-row five">';
+      html += '<section class="activities"><h2 class="label">À dessiner et à jouer</h2><div class="occ-row">';
       for (const [key, label] of Object.entries(etat.activites)) {
-        html += `<button class="occ" data-action="activity" data-genre="${esc(key)}">${icon(key, 22, { color: ACT_COLORS[key] })}${esc(label)}</button>`;
+        const pressed = key === "coloriage" ? ` aria-pressed="${pendingColoring}"` : "";
+        html += `<button class="occ" data-action="activity" data-genre="${esc(key)}"${pressed}>${icon(key, 22, { color: ACT_COLORS[key] })}${esc(label)}</button>`;
       }
-      html += "</div></section>";
+      html += "</div>";
+      if (pendingColoring) {
+        html += '<div class="occ-pick"><span class="q">Coloriage : quel thème ?</span>';
+        for (const [key, label] of Object.entries(etat.categories)) html += `<button class="pick" style="background:${ACT_COLORS.coloriage}" data-action="coloring-theme" data-theme="${esc(key)}">${esc(label)}</button>`;
+        html += `<button class="pick together" data-action="coloring-theme" data-theme="">${icon("sparkle", 16)} Surprise</button></div>`;
+      }
+      html += "</section>";
 
       html += '<section class="home-bottom">';
       if (etat.derniere) {
@@ -790,7 +797,7 @@
 
     async function makeDrawing(request) {
       if (busy) return;
-      const paid = request.genre === "coloriage" || request.genre === "imagier";
+      const paid = request.genre === "coloriage";
       setBusy(true, paid ? "Miette dessine…" : "Miette prépare le jeu…");
       try {
         drawingDraft = await api("POST", "/api/dessins", request);
@@ -883,7 +890,12 @@
       else if (action === "pick") write({ enfants: ids.split(","), occasion: pendingOccasion });
       else if (action === "another") { if (lastRequest) write(lastRequest); }
       else if (action === "print-draft") print(id, true);
-      else if (action === "activity") makeDrawing({ genre: target.dataset.genre });
+      else if (action === "activity") {
+        if (target.dataset.genre !== "coloriage") { makeDrawing({ genre: target.dataset.genre }); return; }
+        pendingColoring = !pendingColoring;
+        renderHome();
+      }
+      else if (action === "coloring-theme") { pendingColoring = false; makeDrawing({ genre: "coloriage", categorie: target.dataset.theme || null }); }
       else if (action === "another-drawing") { if (lastDrawingRequest) makeDrawing(lastDrawingRequest); }
       else if (action === "maze-level") makeDrawing({ genre: "labyrinthe", niveau: target.dataset.level });
       else if (action === "print-drawing") printDrawing(id);
@@ -926,7 +938,7 @@
       document.querySelectorAll("[data-nav]").forEach((a) => {
         if (a.dataset.nav === section) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
       });
-      if (view !== "") pendingOccasion = null;
+      if (view !== "") { pendingOccasion = null; pendingColoring = false; }
       if (view === "") renderHome();
       else if (view === "apercu") renderPreview();
       else if (view === "dessin") renderDrawing();
@@ -940,7 +952,7 @@
     window.addEventListener("hashchange", () => route(true));
     wide.addEventListener("change", () => route(false));
     refreshState().then(() => route(true));
-    setInterval(() => { if (!busy && !document.hidden) refreshState().then(() => { if (current() === "accueil" && !pendingOccasion) renderHome(); }); }, 30000);
+    setInterval(() => { if (!busy && !document.hidden) refreshState().then(() => { if (current() === "accueil" && !pendingOccasion && !pendingColoring) renderHome(); }); }, 30000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshState(); });
   </script>
 </body>

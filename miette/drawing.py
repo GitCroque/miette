@@ -1,4 +1,4 @@
-"""Dessins au trait écrits par Claude en SVG : coloriage, imagier, illustration.
+"""Dessins au trait écrits par Claude en SVG : coloriage et illustration.
 
 Essai du 2026-10-17 avec Opus 5.5 en effort moyen : un sujet seul (chat,
 voiture, maison) sort net et reconnaissable pour 1,4 à 2,7 centimes, en 7 à
@@ -40,16 +40,36 @@ Style : un dessin au trait de livre pour tout-petits. Formes simples et rondes, 
 de grandes zones fermées, pas de hachures ni d'ombres. Le sujet est grand, centré, et reconnaissable
 au premier coup d'œil par un enfant de 2 ans. Un visage doux et souriant si le sujet en a un."""
 
-# Le monde d'un enfant de 2 ans, avec l'article que l'imagier imprime.
-SUBJECTS = (
-    "le chat", "le chien", "le lapin", "le canard", "la vache", "le cochon", "le mouton",
-    "le cheval", "la poule", "l'éléphant", "la girafe", "le lion", "l'ours", "le poisson",
-    "l'escargot", "le papillon", "la coccinelle", "la tortue", "le hibou", "la souris",
-    "la grenouille", "la baleine", "la voiture", "le camion", "le bus", "le tracteur",
-    "le train", "le bateau", "l'avion", "le vélo", "la maison", "l'arbre", "la fleur",
-    "le soleil", "la lune", "le nuage", "la pomme", "la banane", "la fraise", "le ballon",
-    "le gâteau", "la chaussure", "le parapluie", "la tasse",
-)
+# Le monde d'un enfant de 2 ans par thème, avec l'article imprimé sous le dessin.
+# Le coloriage sert aussi d'imagier (fusion décidée par Julien le 2026-10-17) :
+# on colorie le sujet et on dit son nom ensemble.
+CATEGORIES = {
+    "animaux": ("Animaux", (
+        "le chat", "le chien", "le lapin", "le canard", "la vache", "le cochon", "le mouton",
+        "le cheval", "la poule", "l'éléphant", "la girafe", "le lion", "l'ours", "le poisson",
+        "l'escargot", "le papillon", "la coccinelle", "la tortue", "le hibou", "la souris",
+        "la grenouille", "la baleine", "le singe", "le hérisson", "le pingouin", "le zèbre",
+    )),
+    "vehicules": ("Véhicules", (
+        "la voiture", "le camion", "le bus", "le tracteur", "le train", "le bateau", "l'avion",
+        "le vélo", "l'hélicoptère", "la fusée", "la moto", "le camion de pompiers",
+        "la trottinette", "la montgolfière",
+    )),
+    "maison": ("À la maison", (
+        "la maison", "la chaussure", "le parapluie", "la tasse", "le ballon", "le bonnet",
+        "la brosse à dents", "la lampe", "le lit", "la chaise", "le seau et la pelle",
+        "le cadeau", "la poussette",
+    )),
+    "nature": ("Nature", (
+        "l'arbre", "la fleur", "le soleil", "la lune", "le nuage", "l'étoile", "le champignon",
+        "l'arc-en-ciel", "la feuille", "le sapin", "la montagne", "le bonhomme de neige",
+    )),
+    "a-manger": ("À manger", (
+        "la pomme", "la banane", "la fraise", "le gâteau", "la carotte", "la poire", "la glace",
+        "le croissant", "les cerises", "la pastèque", "le biberon", "la tartine",
+    )),
+}
+SUBJECTS = tuple(subject for _, subjects in CATEGORIES.values() for subject in subjects)
 
 ALLOWED = {"svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon",
            "defs", "use", "style", "title", "desc"}
@@ -65,19 +85,19 @@ def noun(subject: str) -> str:
     return re.sub(r"^(le |la |les |l')", "", subject)
 
 
-def pick_subject(recent: list[str], rng: random.Random | None = None) -> str:
+def pick_subject(recent: list[str], category: str | None = None,
+                 rng: random.Random | None = None) -> str:
+    """Un sujet du thème demandé (de tous les thèmes pour une surprise), sans redite récente."""
     rng = rng or random.Random()
-    fresh = [s for s in SUBJECTS if s not in recent]
-    return rng.choice(fresh or SUBJECTS)
+    subjects = CATEGORIES[category][1] if category else SUBJECTS
+    fresh = [s for s in subjects if s not in recent]
+    return rng.choice(fresh or subjects)
 
 
 def coloring_prompt(subject: str) -> str:
-    return f"Coloriage : {noun(subject)}. De grandes zones fermées, faciles à colorier avec un gros crayon."
-
-
-def picture_prompt(subject: str) -> str:
-    return (f"Imagier : {noun(subject)}, seul, dans sa pose la plus typique, "
-            "pour qu'un enfant de 2 ans le reconnaisse et le nomme.")
+    return (f"Coloriage : {noun(subject)}, seul, dans sa pose la plus typique, pour qu'un enfant "
+            "de 2 ans le reconnaisse et le nomme. De grandes zones fermées, faciles à colorier "
+            "avec un gros crayon.")
 
 
 def illustration_prompt(title: str, paragraphs: tuple[str, ...] | list[str]) -> str:

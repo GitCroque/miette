@@ -68,10 +68,8 @@ CIRCLE = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
 
 def test_drawing_tickets():
     picture = drawing.render(CIRCLE, ticket.TEXT_WIDTH)
-    coloring = ticket.render_coloring(picture, date(2026, 10, 17))
-    book = ticket.render_picture_book(picture, "l'hippopotame", date(2026, 10, 17))
-    assert coloring.width == book.width == ticket.WIDTH
-    assert coloring.height > picture.height and book.height > picture.height
+    coloring = ticket.render_coloring(picture, "le camion de pompiers", date(2026, 10, 17))
+    assert coloring.width == ticket.WIDTH and coloring.height > picture.height + 80
     illustrated = ticket.render_raster("Titre", PARAGRAPHS, "Lou", date(2026, 10, 17), picture)
     plain = ticket.render_raster("Titre", PARAGRAPHS, "Lou", date(2026, 10, 17))
     assert illustrated.height >= plain.height + picture.height
