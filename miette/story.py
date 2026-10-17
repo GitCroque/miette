@@ -1,4 +1,4 @@
-"""Écriture d'une histoire courte par un modèle de langage, via OpenRouter.
+"""Écriture d'une histoire courte par un modèle Claude, via l'API Anthropic.
 
 Public : des tout-petits de 2 ans, à qui un adulte lit des histoires du
 quotidien dans le genre des T'choupi. La consigne suit l'âge calculé depuis
@@ -16,9 +16,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-import httpx
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+import anthropic
 
 SITUATIONS = (
     "l'heure du bain", "le repas", "l'heure de la sieste", "le coucher", "la crèche",
@@ -213,14 +211,15 @@ class Story:
 def build_request(system: str, user: str, model: str) -> dict:
     return {
         "model": model,
-        "max_tokens": 900,
-        "temperature": 1.0,
-        # La réflexion du modèle n'apporte rien sur 150 mots et coûte des jetons.
-        "reasoning": {"enabled": False},
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
+        # La réflexion ne se coupe pas sur Opus 5.5 et compte dans max_tokens :
+        # l'effort bas la garde courte, la marge laisse la place à l'histoire.
+        "max_tokens": 4000,
+        "output_config": {"effort": "low"},
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+        # Un refus des filtres de sécurité est rejoué sur le modèle recommandé par Anthropic.
+        "betas": ["server-side-fallback-2026-07-01"],
+        "fallbacks": "default",
     }
 
 
@@ -246,44 +245,38 @@ def parse(raw: str) -> Story:
     return Story(title=title, paragraphs=tuple(paragraphs))
 
 
-def _complete(payload: dict, key: str, client: httpx.Client) -> str:
+def _complete(payload: dict, client: anthropic.Anthropic) -> str:
     try:
-        response = client.post(
-            OPENROUTER_URL,
-            json=payload,
-            headers={"Authorization": f"Bearer {key}", "X-Title": "Miette"},
-        )
-    except httpx.HTTPError as exc:
-        raise StoryError(f"OpenRouter injoignable : {type(exc).__name__}.") from exc
+        message = client.beta.messages.create(**payload)
+    except anthropic.AuthenticationError as exc:
+        raise StoryError("Clé Anthropic refusée (ANTHROPIC_API_KEY) : à renouveler.") from exc
+    except anthropic.RateLimitError as exc:
+        raise StoryError("Anthropic demande de patienter, réessayer dans un instant.") from exc
+    except anthropic.APIStatusError as exc:
+        if exc.status_code == 402:
+            raise StoryError("Crédit Anthropic épuisé ou plafond de dépense atteint.") from exc
+        raise StoryError(f"Anthropic a répondu {exc.status_code}.") from exc
+    except anthropic.APIConnectionError as exc:
+        raise StoryError(f"Anthropic injoignable : {type(exc).__name__}.") from exc
 
-    if response.status_code == 401:
-        raise StoryError("Clé OpenRouter refusée (OPENROUTER_API_KEY) : à renouveler.")
-    if response.status_code == 402:
-        raise StoryError("Crédit OpenRouter épuisé ou plafond mensuel atteint.")
-    if response.status_code >= 400:
-        raise StoryError(f"OpenRouter a répondu {response.status_code}.")
-
-    try:
-        content = response.json()["choices"][0]["message"]["content"]
-    except (ValueError, KeyError, IndexError, TypeError) as exc:
-        raise StoryError("Réponse d'OpenRouter illisible.") from exc
-    # Vu une fois le 2026-09-26 : un 200 avec un contenu nul, cause inconnue.
-    return content or ""
+    if message.stop_reason == "refusal":
+        raise StoryError("Le modèle a refusé d'écrire cette histoire, réessayer.")
+    return "".join(block.text for block in message.content if block.type == "text")
 
 
 def write(system: str, user: str, band: Band, *, key: str, model: str,
-          client: httpx.Client | None = None) -> Story:
+          client: anthropic.Anthropic | None = None) -> Story:
     """Demande une histoire, et la redemande une fois si elle est vide ou hors longueur."""
     if not key:
-        raise StoryError("Aucune clé OpenRouter : renseigner OPENROUTER_API_KEY.")
+        raise StoryError("Aucune clé Anthropic : renseigner ANTHROPIC_API_KEY.")
     payload = build_request(system, user, model)
     low, high = round(band.min_words * 0.7), round(band.max_words * 1.3)
     owned = client is None
-    client = client or httpx.Client(timeout=60)
+    client = client or anthropic.Anthropic(api_key=key, timeout=60, max_retries=1)
     try:
         story = None
         for _ in range(2):
-            raw = _complete(payload, key, client)
+            raw = _complete(payload, client)
             if not raw.strip():
                 continue
             story = parse(raw)

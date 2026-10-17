@@ -132,7 +132,7 @@ def state() -> dict:
         "imprimante": status.message,
         "prete": status.ready,
         "papier_bas": status.paper_low,
-        "cle": bool(settings.openrouter_key),
+        "cle": bool(settings.anthropic_key),
         "restantes": max(0, settings.daily_limit - store.written_today()),
         "enfants": [{"id": c["id"], "prenom": c["prenom"], "age": story.age_label(c, date.today())}
                     for c in store.children()],
@@ -197,7 +197,7 @@ def write_story(request: StoryRequest) -> dict:
     band, user = story.brief(chosen, request.occasion, store.recent_titles(), date.today())
     try:
         written = story.write(story.system_prompt(band), user, band,
-                              key=settings.openrouter_key, model=settings.model)
+                              key=settings.anthropic_key, model=settings.model)
     except story.StoryError as exc:
         raise HTTPException(502, str(exc)) from exc
 

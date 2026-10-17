@@ -11,7 +11,7 @@ from pathlib import Path
 class Settings:
     printer_host: str
     printer_port: int
-    openrouter_key: str
+    anthropic_key: str
     model: str
     data_dir: Path
     daily_limit: int
@@ -21,8 +21,8 @@ def load() -> Settings:
     return Settings(
         printer_host=os.environ.get("MIETTE_IMPRIMANTE", ""),
         printer_port=int(os.environ.get("MIETTE_IMPRIMANTE_PORT", "9100")),
-        openrouter_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
-        model=os.environ.get("MIETTE_MODELE", "anthropic/claude-sonnet-5"),
+        anthropic_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),
+        model=os.environ.get("MIETTE_MODELE", "claude-opus-5-5"),
         data_dir=Path(os.environ.get("MIETTE_DONNEES", "data")),
         daily_limit=int(os.environ.get("MIETTE_LIMITE_JOUR", "20")),
     )

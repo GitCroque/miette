@@ -13,7 +13,7 @@ MAX = {"prenom": "Max", "naissance": "2024-12", "accord": "il"}
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("MIETTE_DONNEES", str(tmp_path))
     monkeypatch.setenv("MIETTE_IMPRIMANTE", "imprimante.test")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "cle-de-test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "cle-de-test")
     monkeypatch.setenv("MIETTE_LIMITE_JOUR", "3")
     import miette.app as app_module
     app_module = importlib.reload(app_module)

@@ -18,7 +18,7 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
 - Une fiche par enfant dans les réglages : prénom, mois de naissance, doudou,
   animaux de la maison, crèche, nounou, copains. L'âge calculé règle la
   longueur et le vocabulaire, les détails se glissent dans les histoires.
-- L'histoire est écrite par un modèle Claude via [OpenRouter](https://openrouter.ai) :
+- L'histoire est écrite par un modèle Claude via l'[API Anthropic](https://platform.claude.com) :
   une situation du quotidien et au plus une petite émotion, dans l'esprit des
   livres pour tout-petits, puis composée en image avec Pillow et envoyée à
   l'imprimante en ESC/POS sur TCP 9100.
@@ -44,20 +44,22 @@ sérialise tous ses accès et garde l'état affiché quelques secondes en cache.
 |---|---|---|
 | `MIETTE_IMPRIMANTE` | Adresse de l'imprimante sur le réseau local | aucun, obligatoire |
 | `MIETTE_IMPRIMANTE_PORT` | Port ESC/POS brut | `9100` |
-| `OPENROUTER_API_KEY` | Clé OpenRouter | aucun, obligatoire |
-| `MIETTE_MODELE` | Modèle OpenRouter | `anthropic/claude-sonnet-5` |
+| `ANTHROPIC_API_KEY` | Clé de l'API Anthropic | aucun, obligatoire |
+| `MIETTE_MODELE` | Modèle Claude | `claude-opus-5-5` |
 | `MIETTE_LIMITE_JOUR` | Nombre maximal d'histoires générées par jour | `20` |
 | `MIETTE_DONNEES` | Dossier de la base (fiches et histoires) | `/data` dans l'image |
 
-Sonnet 5 plutôt que Haiku 4.5 : sur un premier essai, Haiku laissait environ
-une faute de français par histoire (accords, « calm » pour « calme »), Sonnet
-aucune, pour environ 0,3 centime par histoire.
+Haiku 4.5 a été écarté au premier essai : il laissait environ une faute de
+français par histoire (accords, « calm » pour « calme »). Opus 5.5 tourne en
+effort bas : sa réflexion ne se coupe pas, et une histoire de 150 mots n'en
+demande pas davantage. Un refus des filtres de sécurité est rejoué côté
+Anthropic sur le modèle de repli recommandé (`fallbacks: "default"`).
 
 ## Lancer
 
 ```bash
 docker run -d -p 8090:8090 -v miette-data:/data \
-  -e MIETTE_IMPRIMANTE=192.168.1.50 -e OPENROUTER_API_KEY=... \
+  -e MIETTE_IMPRIMANTE=192.168.1.50 -e ANTHROPIC_API_KEY=... \
   ghcr.io/gitcroque/miette:latest
 ```
 
@@ -71,7 +73,7 @@ une (Cloudflare Access, par exemple).
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest
-MIETTE_IMPRIMANTE=... OPENROUTER_API_KEY=... .venv/bin/uvicorn miette.app:app --reload --port 8090
+MIETTE_IMPRIMANTE=... ANTHROPIC_API_KEY=... .venv/bin/uvicorn miette.app:app --reload --port 8090
 ```
 
 Le dossier `outils/` contient les scripts d'atelier : `mire.py` et

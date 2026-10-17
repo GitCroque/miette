@@ -1,7 +1,8 @@
 import random
 from datetime import date
 
-import httpx
+import anthropic
+import httpx2
 import pytest
 
 from miette import story
@@ -94,11 +95,16 @@ def test_recent_titles_are_excluded():
 
 
 def _client(handler):
-    return httpx.Client(transport=httpx.MockTransport(handler))
+    return anthropic.Anthropic(api_key="k", max_retries=0,
+                               http_client=httpx2.Client(transport=httpx2.MockTransport(handler)))
 
 
-def _answer(text):
-    return httpx.Response(200, json={"choices": [{"message": {"content": text}}]})
+def _answer(text, stop_reason="end_turn"):
+    content = [{"type": "text", "text": text}] if text else []
+    return httpx2.Response(200, json={
+        "id": "msg_test", "type": "message", "role": "assistant", "model": "m", "content": content,
+        "stop_reason": stop_reason, "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 1},
+    })
 
 
 BAND = story.band_for(25)
@@ -114,24 +120,30 @@ def test_write_retries_when_too_short():
 
     written = story.write("s", "u", BAND, key="k", model="m", client=_client(handler))
     assert len(calls) == 2 and written.words == 120
-    assert calls[0].headers["Authorization"] == "Bearer k"
+    assert calls[0].headers["x-api-key"] == "k"
 
 
 def test_write_retries_after_an_empty_answer():
-    answers = iter([httpx.Response(200, json={"choices": [{"message": {"content": None}}]}), _answer(f"Titre\n\n{BODY}")])
+    answers = iter([_answer(""), _answer(f"Titre\n\n{BODY}")])
     written = story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: next(answers)))
     assert written.title == "Titre"
 
 
 def test_write_gives_up_after_two_empty_answers():
-    empty = httpx.Response(200, json={"choices": [{"message": {"content": None}}]})
+    empty = _answer("")
     with pytest.raises(story.StoryError, match="vides"):
         story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: empty))
 
 
 def test_write_explains_a_refused_key():
-    with pytest.raises(story.StoryError, match="OPENROUTER_API_KEY"):
-        story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: httpx.Response(401)))
+    refused = httpx2.Response(401, json={"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}})
+    with pytest.raises(story.StoryError, match="ANTHROPIC_API_KEY"):
+        story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: refused))
+
+
+def test_write_explains_a_refusal():
+    with pytest.raises(story.StoryError, match="refusé"):
+        story.write("s", "u", BAND, key="k", model="m", client=_client(lambda r: _answer("", "refusal")))
 
 
 def test_write_without_key():
@@ -139,8 +151,12 @@ def test_write_without_key():
         story.write("s", "u", BAND, key="", model="m")
 
 
-def test_request_disables_reasoning():
-    assert story.build_request("s", "u", "m")["reasoning"] == {"enabled": False}
+def test_request_keeps_thinking_short_and_falls_back_on_refusal():
+    request = story.build_request("s", "u", "m")
+    assert request["output_config"] == {"effort": "low"}
+    assert request["fallbacks"] == "default"
+    # Opus 5.5 refuse la température et la réflexion coupée.
+    assert "temperature" not in request and "thinking" not in request
 
 
 def test_two_girls_are_agreed_in_the_feminine():
