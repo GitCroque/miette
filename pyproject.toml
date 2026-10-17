@@ -15,6 +15,7 @@ dependencies = [
     "python-escpos>=3.1,<4",
     "pillow>=11,<13",
     "anthropic>=1.15,<2",
+    "resvg-py>=0.5,<1",
 ]
 
 [project.optional-dependencies]

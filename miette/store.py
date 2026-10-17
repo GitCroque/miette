@@ -5,6 +5,10 @@ le dépôt. Le carnet garde chaque histoire écrite, imprimée ou non : il sert
 à réimprimer sans repayer, à éviter les redites et à compter les histoires
 du jour pour le plafond quotidien. Une histoire supprimée depuis l'historique
 est seulement marquée : elle reste comptée dans le plafond du jour.
+
+Les dessins et les jeux ont leur propre table. Un jeu ne garde que de quoi le
+redessiner à l'identique (sujet et graine), un dessin de Claude garde son SVG :
+l'aperçu et l'impression doivent montrer le même ticket.
 """
 
 from __future__ import annotations
@@ -33,7 +37,17 @@ CREATE TABLE IF NOT EXISTS histoires (
     mots INTEGER NOT NULL,
     imprimee TEXT,
     favori INTEGER NOT NULL DEFAULT 0,
-    supprimee TEXT
+    supprimee TEXT,
+    illustration TEXT
+);
+CREATE TABLE IF NOT EXISTS dessins (
+    id TEXT PRIMARY KEY,
+    cree TEXT NOT NULL,
+    genre TEXT NOT NULL,
+    sujet TEXT NOT NULL,
+    svg TEXT,
+    graine INTEGER,
+    imprime TEXT
 );
 """
 
@@ -42,7 +56,11 @@ CREATE TABLE IF NOT EXISTS histoires (
 LATER_COLUMNS = {
     "favori": "INTEGER NOT NULL DEFAULT 0",
     "supprimee": "TEXT",
+    "illustration": "TEXT",
 }
+
+# Dessins écrits par Claude : ils coûtent comme une histoire et partagent son plafond.
+PAID_KINDS = ("coloriage", "imagier")
 
 
 @dataclass(frozen=True)
@@ -57,6 +75,18 @@ class StoredStory:
     words: int
     printed: str | None
     favorite: bool = False
+    illustration: str | None = None
+
+
+@dataclass(frozen=True)
+class StoredDrawing:
+    id: str
+    created: str
+    kind: str
+    subject: str
+    svg: str | None
+    seed: int | None
+    printed: str | None
 
 
 class Store:
@@ -118,6 +148,11 @@ class Store:
                              (datetime.now().isoformat(timespec="seconds"), story_id))
             self._db.commit()
 
+    def set_illustration(self, story_id: str, svg: str) -> None:
+        with self._lock:
+            self._db.execute("UPDATE histoires SET illustration = ? WHERE id = ?", (svg, story_id))
+            self._db.commit()
+
     def set_favorite(self, story_id: str, favorite: bool) -> None:
         with self._lock:
             self._db.execute("UPDATE histoires SET favori = ? WHERE id = ?", (int(favorite), story_id))
@@ -153,12 +188,54 @@ class Store:
         return [r["titre"] for r in rows]
 
     def written_today(self) -> int:
-        today = datetime.now().date().isoformat()
+        """Histoires et dessins de Claude du jour, pour le plafond quotidien."""
+        today = f"{datetime.now().date().isoformat()}%"
+        marks = ", ".join("?" for _ in PAID_KINDS)
         with self._lock:
-            row = self._db.execute(
-                "SELECT COUNT(*) AS n FROM histoires WHERE cree LIKE ?", (f"{today}%",)
-            ).fetchone()
-        return row["n"]
+            stories = self._db.execute(
+                "SELECT COUNT(*) AS n FROM histoires WHERE cree LIKE ?", (today,)
+            ).fetchone()["n"]
+            drawings = self._db.execute(
+                f"SELECT COUNT(*) AS n FROM dessins WHERE cree LIKE ? AND genre IN ({marks})",
+                (today, *PAID_KINDS),
+            ).fetchone()["n"]
+        return stories + drawings
+
+    # Dessins et jeux
+
+    def add_drawing(self, *, kind: str, subject: str, svg: str | None = None,
+                    seed: int | None = None) -> StoredDrawing:
+        drawing = StoredDrawing(
+            id=uuid.uuid4().hex[:12], created=datetime.now().isoformat(timespec="seconds"),
+            kind=kind, subject=subject, svg=svg, seed=seed, printed=None,
+        )
+        with self._lock:
+            self._db.execute(
+                "INSERT INTO dessins (id, cree, genre, sujet, svg, graine) VALUES (?, ?, ?, ?, ?, ?)",
+                (drawing.id, drawing.created, kind, subject, svg, seed),
+            )
+            self._db.commit()
+        return drawing
+
+    def drawing(self, drawing_id: str) -> StoredDrawing | None:
+        with self._lock:
+            row = self._db.execute("SELECT * FROM dessins WHERE id = ?", (drawing_id,)).fetchone()
+        return _drawing(row) if row else None
+
+    def mark_drawing_printed(self, drawing_id: str) -> None:
+        with self._lock:
+            self._db.execute("UPDATE dessins SET imprime = ? WHERE id = ?",
+                             (datetime.now().isoformat(timespec="seconds"), drawing_id))
+            self._db.commit()
+
+    def recent_subjects(self, kinds: tuple[str, ...], count: int = 12) -> list[str]:
+        marks = ", ".join("?" for _ in kinds)
+        with self._lock:
+            rows = self._db.execute(
+                f"SELECT sujet FROM dessins WHERE genre IN ({marks}) ORDER BY cree DESC LIMIT ?",
+                (*kinds, count),
+            ).fetchall()
+        return [r["sujet"] for r in rows]
 
 
 def _story(row: sqlite3.Row) -> StoredStory:
@@ -167,4 +244,12 @@ def _story(row: sqlite3.Row) -> StoredStory:
         occasion=row["occasion"], title=row["titre"],
         paragraphs=json.loads(row["paragraphes"]), model=row["modele"],
         words=row["mots"], printed=row["imprimee"], favorite=bool(row["favori"]),
+        illustration=row["illustration"],
+    )
+
+
+def _drawing(row: sqlite3.Row) -> StoredDrawing:
+    return StoredDrawing(
+        id=row["id"], created=row["cree"], kind=row["genre"], subject=row["sujet"],
+        svg=row["svg"], seed=row["graine"], printed=row["imprime"],
     )

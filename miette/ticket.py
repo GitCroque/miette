@@ -107,6 +107,10 @@ class _Page:
                        anchor="ma" if center else "la")
         self.y += height
 
+    def picture(self, image: Image.Image) -> None:
+        self.image.paste(image.convert("L"), ((WIDTH - image.width) // 2, self.y))
+        self.y += image.height
+
     def rule(self, length: int = 180, thickness: int = 3) -> None:
         x0 = (WIDTH - length) // 2
         self.draw.rectangle([x0, self.y, x0 + length - 1, self.y + thickness - 1], fill=0)
@@ -117,8 +121,15 @@ class _Page:
         return cropped.point(lambda v: 0 if v < THRESHOLD else 255, mode="1")
 
 
+def _footer(page: _Page, day: date) -> None:
+    page.space(22)
+    page.rule(80, 2)
+    page.space(14)
+    page.line(f"Miette, le {french_date(day)}", font(SERIF_ITALIC, 20), 28, center=True)
+
+
 def render_raster(title: str, paragraphs: tuple[str, ...], name: str,
-                  day: date) -> Image.Image:
+                  day: date, picture: Image.Image | None = None) -> Image.Image:
     page = _Page()
     page.space(6)
 
@@ -130,6 +141,10 @@ def render_raster(title: str, paragraphs: tuple[str, ...], name: str,
 
     page.rule()
     page.space(26)
+
+    if picture is not None:
+        page.picture(picture)
+        page.space(18)
 
     title_face = font(ROUNDED, TITLE_SIZE, 600)
     for line in wrap(typeset(title), title_face, TEXT_WIDTH):
@@ -144,8 +159,36 @@ def render_raster(title: str, paragraphs: tuple[str, ...], name: str,
         for line in wrap(typeset(paragraph), body_face, TEXT_WIDTH):
             page.line(line, body_face, body_height)
 
-    page.space(22)
-    page.rule(80, 2)
-    page.space(14)
-    page.line(f"Miette, le {french_date(day)}", font(SERIF_ITALIC, 20), 28, center=True)
+    _footer(page, day)
+    return page.finish()
+
+
+def render_coloring(picture: Image.Image, day: date) -> Image.Image:
+    page = _Page()
+    page.space(6)
+    page.line("À colorier", font(ROUNDED, 34, 600), 44, center=True)
+    page.space(10)
+    page.picture(picture)
+    _footer(page, day)
+    return page.finish()
+
+
+def render_picture_book(picture: Image.Image, subject: str, day: date) -> Image.Image:
+    """Une page d'imagier : le dessin, puis son nom en grand pour le dire ensemble."""
+    page = _Page()
+    page.space(6)
+    page.picture(picture)
+    page.space(12)
+    size = fit_size(typeset(subject), ROUNDED, 700, 80, TEXT_WIDTH)
+    page.line(typeset(subject), font(ROUNDED, size, 700), round(size * 1.15), center=True)
+    _footer(page, day)
+    return page.finish()
+
+
+def render_game(sheet: Image.Image, day: date) -> Image.Image:
+    """Un jeu des générateurs, déjà composé à la largeur du ticket, signé en bas."""
+    page = _Page()
+    page.space(6)
+    page.picture(sheet)
+    _footer(page, day)
     return page.finish()

@@ -1,6 +1,6 @@
 from datetime import date
 
-from miette import ticket
+from miette import drawing, ticket
 from miette.generators import dot_to_dot, find_them, maze
 
 PARAGRAPHS = (
@@ -58,3 +58,20 @@ def test_games_are_drawn_at_printer_width():
     sheets.append(find_them.render("étoile", seed=1)[0])
     for sheet in sheets:
         assert sheet.width == ticket.WIDTH
+        image = ticket.render_game(sheet.to_bilevel(), date(2026, 10, 17))
+        assert image.mode == "1" and image.width == ticket.WIDTH
+
+
+CIRCLE = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+          '<circle cx="256" cy="256" r="180" fill="none" stroke="#000" stroke-width="12"/></svg>')
+
+
+def test_drawing_tickets():
+    picture = drawing.render(CIRCLE, ticket.TEXT_WIDTH)
+    coloring = ticket.render_coloring(picture, date(2026, 10, 17))
+    book = ticket.render_picture_book(picture, "l'hippopotame", date(2026, 10, 17))
+    assert coloring.width == book.width == ticket.WIDTH
+    assert coloring.height > picture.height and book.height > picture.height
+    illustrated = ticket.render_raster("Titre", PARAGRAPHS, "Lou", date(2026, 10, 17), picture)
+    plain = ticket.render_raster("Titre", PARAGRAPHS, "Lou", date(2026, 10, 17))
+    assert illustrated.height >= plain.height + picture.height

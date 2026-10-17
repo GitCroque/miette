@@ -26,7 +26,14 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
 - Fiches et histoires vivent dans une base SQLite sur le volume (`miette.db`) :
   une histoire se réimprime sans nouvel appel au modèle, et les titres récents
   sont écartés pour éviter les redites.
-- Un plafond quotidien d'histoires écrites protège contre un bouton qui s'emballe.
+- Chaque histoire reçoit une illustration, dessinée après le texte pendant
+  qu'on lit l'aperçu, puis imprimée au-dessus du titre.
+- Des dessins et des jeux, chacun sur son propre ticket : coloriage et imagier
+  (un sujet du quotidien tiré au sort, avec son nom en grand pour l'imagier),
+  labyrinthe en quatre niveaux, points à relier, cherche et trouve. L'aperçu
+  montre le ticket exact, rendu par le serveur en noir et blanc.
+- Un plafond quotidien d'histoires et de dessins écrits par le modèle protège
+  contre un bouton qui s'emballe. Les jeux, calculés sur place, n'y comptent pas.
 
 ## Matériel
 
@@ -48,6 +55,12 @@ sérialise tous ses accès et garde l'état affiché quelques secondes en cache.
 | `MIETTE_MODELE` | Modèle Claude | `claude-opus-5-5` |
 | `MIETTE_LIMITE_JOUR` | Nombre maximal d'histoires générées par jour | `20` |
 | `MIETTE_DONNEES` | Dossier de la base (fiches et histoires) | `/data` dans l'image |
+
+Les dessins sont écrits par le même modèle, en SVG (effort moyen), puis
+nettoyés (seules les formes passent) et rendus en 1 bit avec resvg. À l'essai,
+un sujet seul sort net pour 1,5 à 3 centimes ; une scène à plusieurs
+personnages se brouille, d'où une illustration centrée sur un seul élément de
+l'histoire.
 
 Haiku 4.5 a été écarté au premier essai : il laissait environ une faute de
 français par histoire (accords, « calm » pour « calme »). Opus 5.5 tourne en
@@ -77,9 +90,9 @@ MIETTE_IMPRIMANTE=... ANTHROPIC_API_KEY=... .venv/bin/uvicorn miette.app:app --r
 ```
 
 Le dossier `outils/` contient les scripts d'atelier : `mire.py` et
-`premier_ticket.py` (mire de référence de l'imprimante), `preview.py` (jeux
-imprimables : labyrinthe, points à relier, cherche et trouve, pas encore
-branchés sur l'app), `icones.py` (icônes de l'app web).
+`premier_ticket.py` (mire de référence de l'imprimante), `preview.py` (tous
+les jeux en PNG avec leurs contrôles, pour les juger sans papier),
+`icones.py` (icônes de l'app web).
 
 ## Licence
 

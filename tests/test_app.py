@@ -1,12 +1,16 @@
 import importlib
+import io
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
-from miette import printer, story
+from miette import drawing, printer, story
 
 LOU = {"prenom": "Lou", "naissance": "2024-10", "accord": "elle", "doudou": "Lapinou"}
 MAX = {"prenom": "Max", "naissance": "2024-12", "accord": "il"}
+CIRCLE = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+          '<circle cx="256" cy="256" r="180" fill="none" stroke="#000" stroke-width="12"/></svg>')
 
 
 @pytest.fixture
@@ -27,8 +31,15 @@ def client(tmp_path, monkeypatch):
         return story.Story(f"Histoire {len(briefs)}", ("Un paragraphe.", "Un autre."))
 
     monkeypatch.setattr(story, "write", fake_write)
+    prompts = []
+
+    def fake_draw(prompt, key, model):
+        prompts.append(prompt)
+        return CIRCLE
+
+    monkeypatch.setattr(drawing, "draw", fake_draw)
     test_client = TestClient(app_module.app)
-    test_client.printed, test_client.briefs = printed, briefs
+    test_client.printed, test_client.briefs, test_client.prompts = printed, briefs, prompts
     return test_client
 
 
@@ -176,3 +187,67 @@ def test_printing_always_checks_the_printer_again(client, monkeypatch):
     story_id = client.post("/api/histoires", json={"enfants": [lou]}).json()["id"]
     monkeypatch.setattr(printer, "status", lambda host, port: printer.Status(False, "Le capot est ouvert."))
     assert client.post(f"/api/histoires/{story_id}/imprimer").json()["detail"] == "Le capot est ouvert."
+
+
+def test_coloring_preview_then_print(client):
+    data = client.post("/api/dessins", json={"genre": "coloriage"}).json()
+    assert data["sujet"] in drawing.SUBJECTS and data["imprime"] is None
+    assert "Coloriage" in client.prompts[0]
+    assert client.get(f"/api/dessins/{data['id']}.png").headers["content-type"] == "image/png"
+    assert client.printed == []
+    assert client.post(f"/api/dessins/{data['id']}/imprimer").json()["imprime"]
+    assert len(client.printed) == 1 and client.printed[0].width == 512
+
+
+def test_games_need_no_model_and_no_daily_allowance(client):
+    for genre in ("labyrinthe", "points", "cherche"):
+        data = client.post("/api/dessins", json={"genre": genre}).json()
+        assert client.get(f"/api/dessins/{data['id']}.png").status_code == 200
+    assert client.prompts == []
+    assert client.get("/api/etat").json()["restantes"] == 3
+
+
+def test_maze_keeps_its_level_and_prints_what_was_previewed(client):
+    data = client.post("/api/dessins", json={"genre": "labyrinthe", "niveau": "moyen"}).json()
+    assert data["sujet"] == "moyen"
+    preview = Image.open(io.BytesIO(client.get(f"/api/dessins/{data['id']}.png").content))
+    client.post(f"/api/dessins/{data['id']}/imprimer")
+    assert preview.convert("1").tobytes() == client.printed[0].convert("1").tobytes()
+
+
+def test_drawings_share_the_daily_limit_with_stories(client):
+    lou, = _children(client, LOU)
+    client.post("/api/histoires", json={"enfants": [lou]})
+    client.post("/api/dessins", json={"genre": "coloriage"})
+    client.post("/api/dessins", json={"genre": "imagier"})
+    assert client.post("/api/dessins", json={"genre": "coloriage"}).status_code == 429
+    assert client.post("/api/histoires", json={"enfants": [lou]}).status_code == 429
+    assert client.post("/api/dessins", json={"genre": "labyrinthe"}).status_code == 200
+
+
+def test_unknown_activity_is_rejected(client):
+    assert client.post("/api/dessins", json={"genre": "sudoku"}).status_code == 422
+    assert client.post("/api/dessins", json={"genre": "labyrinthe", "niveau": "géant"}).status_code == 422
+
+
+def test_illustration_is_drawn_once_and_printed_with_the_story(client):
+    lou, = _children(client, LOU)
+    story_id = client.post("/api/histoires", json={"enfants": [lou]}).json()["id"]
+    assert client.get(f"/api/histoires/{story_id}/illustration.png").status_code == 404
+    client.post(f"/api/histoires/{story_id}/imprimer")
+    plain = client.printed[-1].height
+    assert client.post(f"/api/histoires/{story_id}/illustration").json()["illustration"] is True
+    client.post(f"/api/histoires/{story_id}/illustration")
+    assert len(client.prompts) == 1 and "Histoire 1" in client.prompts[0]
+    assert client.get(f"/api/histoires/{story_id}/illustration.png").headers["content-type"] == "image/png"
+    client.post(f"/api/histoires/{story_id}/imprimer")
+    assert client.printed[-1].height > plain + 400
+
+
+def test_a_failed_drawing_is_explained(client, monkeypatch):
+    def fail(prompt, key, model):
+        raise drawing.DrawingError("Le dessin reçu est vide. Réessayer dans un instant.")
+
+    monkeypatch.setattr(drawing, "draw", fail)
+    response = client.post("/api/dessins", json={"genre": "imagier"})
+    assert response.status_code == 502 and "vide" in response.json()["detail"]

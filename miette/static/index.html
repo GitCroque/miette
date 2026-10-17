@@ -189,7 +189,7 @@
       .kid .name b, .kid.together .name b { font-size: 24px; }
     }
 
-    .occasions { margin-top: 22px; }
+    .occasions, .activities { margin-top: 22px; }
     .occ-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -20px; padding: 0 20px; scrollbar-width: none; }
     .occ-row::-webkit-scrollbar { display: none; }
     .occ { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 700; font-size: 15px; }
@@ -200,6 +200,7 @@
     .pick.together { background: var(--inverse-bg); color: var(--inverse-ink); }
     @media (min-width: 700px) {
       .occ-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; overflow: visible; }
+      .occ-row.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
       .occ { flex-direction: column; align-items: flex-start; justify-content: space-between; height: 104px; padding: 16px; border-radius: 20px; font-size: 16px; font-weight: 800; text-align: left; }
       .occ svg { width: 28px; height: 28px; }
     }
@@ -247,6 +248,14 @@
     @media (min-width: 700px) { .story-title { font-size: 36px; } .story { font-size: 20px; line-height: 1.65; } }
     .reader-meta { font-size: 13px; color: var(--soft); font-weight: 800; margin-bottom: 6px; }
     .reader { max-width: 700px; }
+    /* Dessins : l'image est le ticket lui-même, rendu par le serveur en noir et blanc. */
+    .picture { display: block; width: 100%; max-width: 340px; aspect-ratio: 1; margin: 4px auto 18px; border-radius: 16px; background: #FFFFFF; }
+    .picture.pending { display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--paper-2); color: var(--soft); font-weight: 700; font-size: 15px; }
+    .ticket-sheet { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .ticket-sheet .chips { align-self: flex-start; margin: 0; }
+    .ticket-img { display: block; width: 100%; max-width: 384px; background: #FFFFFF; border-radius: 6px; box-shadow: 0 0 0 1px var(--line), 0 8px 24px rgba(0, 0, 0, .08); }
+    .seg.four { grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 520px; width: 100%; margin: 0; }
+    .seg.four button { font-size: 14px; }
 
     /* Historique */
     .hist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -375,6 +384,11 @@
       fetes: '<path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/>',
       voyage: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/>',
       "premieres-fois": '<path d="M12 21v-9"/><path d="M12 12C12 8 9 6 5 6c0 4 3 6 7 6z"/><path d="M12 10c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+      coloriage: '<path d="M15 4l5 5L9 20H4v-5z"/><path d="M13 6l5 5"/>',
+      imagier: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/>',
+      labyrinthe: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M8 4v8h4M16 8v12M8 16h4"/>',
+      points: '<circle cx="5" cy="18" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="19" cy="18" r="1.5"/><path d="M6 16l5-9M13 7l5 9" stroke-dasharray="2 3"/>',
+      cherche: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
     };
     function icon(name, size = 20, options = {}) {
       const fill = options.fill ? "currentColor" : "none";
@@ -384,11 +398,17 @@
     // Une couleur par enfant, dans l'ordre des fiches ; texte blanc lisible sur chacune.
     const COLORS = ["#C2532F", "#2F6B70", "#6B5B95", "#86651C", "#3E6A2E", "#8A3F66"];
     const OCC_COLORS = { "anniversaire": "#C2532F", "fetes": "#2F6B70", "voyage": "#C2532F", "premieres-fois": "#2F6B70" };
+    const ACT_COLORS = { coloriage: "#6B5B95", imagier: "#86651C", labyrinthe: "#2F6B70", points: "#C2532F", cherche: "#3E6A2E" };
     const wide = window.matchMedia("(min-width: 1100px)");
 
     let etat = null;
     let draft = session.get("miette.apercu");
     let lastRequest = session.get("miette.demande");
+    let drawingDraft = session.get("miette.dessin");
+    let lastDrawingRequest = session.get("miette.dessin.demande");
+    // L'illustration se dessine après l'histoire, pendant qu'on la lit : une seule tentative par histoire.
+    let illustrating = null;
+    const illustrationTried = new Set();
     let pendingOccasion = null;
     let historyItems = null;
     let historyFilter = "toutes";
@@ -468,7 +488,8 @@
       $("#top-status").innerHTML = `<span class="txt">${esc(etat.imprimante.replace(/\.$/, ""))}</span>`;
       $("#side-status").className = "state " + level;
       $("#side-status").textContent = etat.prete && !etat.papier_bas ? "Imprimante prête" : etat.imprimante;
-      $("#side-remaining").textContent = `${etat.restantes} histoire${etat.restantes > 1 ? "s" : ""} encore possible${etat.restantes > 1 ? "s" : ""} aujourd'hui`;
+      const plural = etat.restantes > 1 ? "s" : "";
+      $("#side-remaining").textContent = `${etat.restantes} histoire${plural} ou dessin${plural} encore possible${plural} aujourd'hui`;
       return etat;
     }
     function statusPill() {
@@ -531,6 +552,12 @@
       }
       html += "</section>";
 
+      html += '<section class="activities"><h2 class="label">À dessiner et à jouer</h2><div class="occ-row five">';
+      for (const [key, label] of Object.entries(etat.activites)) {
+        html += `<button class="occ" data-action="activity" data-genre="${esc(key)}">${icon(key, 22, { color: ACT_COLORS[key] })}${esc(label)}</button>`;
+      }
+      html += "</div></section>";
+
       html += '<section class="home-bottom">';
       if (etat.derniere) {
         const s = etat.derniere;
@@ -553,18 +580,57 @@
 
     // Aperçu
 
+    function pictureHtml(story) {
+      if (story.illustration) return `<img class="picture" src="/api/histoires/${esc(story.id)}/illustration.png" alt="Illustration de l'histoire">`;
+      if (illustrating === story.id) return `<div class="picture pending">${icon("sparkle", 18)}Miette dessine…</div>`;
+      return "";
+    }
+
+    async function illustrate(id) {
+      illustrationTried.add(id);
+      illustrating = id;
+      try {
+        const story = await api("POST", `/api/histoires/${id}/illustration`);
+        if (draft && draft.id === id) { draft = story; session.set("miette.apercu", draft); }
+      } catch (error) {
+        toast("Pas d'illustration : " + error.message, true);
+      } finally {
+        if (illustrating === id) illustrating = null;
+        if (location.hash === "#/apercu" && draft && draft.id === id) renderPreview();
+      }
+    }
+
     function renderPreview() {
       const view = $("#view");
       view.className = "";
       if (!draft) { location.hash = "#/"; return; }
+      if (!draft.illustration && !illustrationTried.has(draft.id)) illustrate(draft.id);
       const occasion = draft.occasion && etat ? etat.occasions[draft.occasion] : null;
       view.innerHTML = `<div class="view-head"><div class="titles"><a class="round" href="#/" aria-label="Retour à l'accueil">${icon("back", 20)}</a>
           <div><b>Aperçu</b><small>Rien n'est encore imprimé</small></div></div></div>
         <article class="sheet"><div class="chips"><span class="chip accent">Pour ${esc(draft.pour)}</span>
           <span class="chip">${occasion ? icon(draft.occasion, 14) + esc(occasion) : icon("sparkle", 14) + "Surprise"}</span></div>
-          <h1 class="story-title">${esc(draft.titre)}</h1><div class="story">${paragraphs(draft.texte)}</div></article>
+          ${pictureHtml(draft)}<h1 class="story-title">${esc(draft.titre)}</h1><div class="story">${paragraphs(draft.texte)}</div></article>
         <div class="actionbar" style="max-width:760px"><button class="btn big-btn" data-action="another">${icon("again", 18)}Une autre</button>
-          <button class="btn big-btn primary grow" data-action="print-draft" data-id="${esc(draft.id)}">${icon("printer", 20)}Imprimer</button></div>`;
+          <button class="btn big-btn primary grow" data-action="print-draft" data-id="${esc(draft.id)}"${illustrating === draft.id ? " disabled" : ""}>${icon("printer", 20)}${illustrating === draft.id ? "Illustration en cours" : "Imprimer"}</button></div>`;
+    }
+
+    // Aperçu d'un dessin ou d'un jeu
+
+    function renderDrawing() {
+      const view = $("#view");
+      view.className = "";
+      if (!drawingDraft) { location.hash = "#/"; return; }
+      const d = drawingDraft;
+      const levels = d.genre === "labyrinthe" && etat
+        ? `<div class="seg four" role="group" aria-label="Niveau">${etat.niveaux.map((n) => `<button data-action="maze-level" data-level="${esc(n)}" aria-pressed="${d.sujet === n}">${esc(n)}</button>`).join("")}</div>`
+        : "";
+      view.innerHTML = `<div class="view-head"><div class="titles"><a class="round" href="#/" aria-label="Retour à l'accueil">${icon("back", 20)}</a>
+          <div><b>Aperçu</b><small>Rien n'est encore imprimé</small></div></div></div>
+        <article class="sheet ticket-sheet"><div class="chips"><span class="chip accent">${icon(d.genre, 14)}${esc(d.titre)}</span></div>
+          ${levels}<img class="ticket-img" src="/api/dessins/${esc(d.id)}.png" alt="${esc(d.titre)}"></article>
+        <div class="actionbar" style="max-width:760px"><button class="btn big-btn" data-action="another-drawing">${icon("again", 18)}Un autre</button>
+          <button class="btn big-btn primary grow" data-action="print-drawing" data-id="${esc(d.id)}">${icon("printer", 20)}Imprimer</button></div>`;
     }
 
     // Historique et lecture
@@ -613,7 +679,7 @@
           <h2 class="story-title">${esc(selected.titre)}</h2></div><div class="tools">${readerTools(selected, false)}
           <button class="btn icon-only danger" data-action="delete" data-id="${esc(selected.id)}" aria-label="Supprimer l'histoire">${icon("trash", 20)}</button>
           <button class="btn dark" data-action="reprint" data-id="${esc(selected.id)}">${icon("printer", 18)}Réimprimer</button></div></div>
-          <div class="story">${paragraphs(selected.texte)}</div>` : '<p class="empty">Choisis une histoire à gauche.</p>'}</article></div>`;
+          ${pictureHtml(selected)}<div class="story">${paragraphs(selected.texte)}</div>` : '<p class="empty">Choisis une histoire à gauche.</p>'}</article></div>`;
     }
 
     async function renderStory(id) {
@@ -626,7 +692,7 @@
       }
       view.innerHTML = `<div class="view-head"><a class="back" href="#/historique">${icon("back", 20)}Historique</a>${readerTools(story, true)}</div>
         <article class="reader"><div class="reader-meta">${esc(story.pour)} · ${esc(longDate(story.imprimee || story.date))}${story.occasion ? " · " + esc(etat.occasions[story.occasion]) : ""}</div>
-        <h1 class="story-title">${esc(story.titre)}</h1><div class="story">${paragraphs(story.texte)}</div></article>
+        ${pictureHtml(story)}<h1 class="story-title">${esc(story.titre)}</h1><div class="story">${paragraphs(story.texte)}</div></article>
         <div class="actionbar" style="max-width:700px"><button class="btn big-btn danger" data-action="delete" data-id="${esc(story.id)}" aria-label="Supprimer l'histoire">${icon("trash", 18)}<span class="lbl">Supprimer</span></button>
         <button class="btn big-btn dark grow" data-action="reprint" data-id="${esc(story.id)}">${icon("printer", 20)}Réimprimer</button></div>`;
     }
@@ -711,6 +777,41 @@
       }
     }
 
+    async function makeDrawing(request) {
+      if (busy) return;
+      const paid = request.genre === "coloriage" || request.genre === "imagier";
+      setBusy(true, paid ? "Miette dessine…" : "Miette prépare le jeu…");
+      try {
+        drawingDraft = await api("POST", "/api/dessins", request);
+        lastDrawingRequest = request;
+        session.set("miette.dessin", drawingDraft);
+        session.set("miette.dessin.demande", request);
+        if (location.hash === "#/dessin") renderDrawing(); else location.hash = "#/dessin";
+      } catch (error) {
+        toast(error.message, true);
+      } finally {
+        setBusy(false);
+        if (paid) refreshState();
+      }
+    }
+
+    async function printDrawing(id) {
+      if (busy) return;
+      setBusy(true, "Impression…");
+      try {
+        await api("POST", `/api/dessins/${id}/imprimer`);
+        toast("Imprimé");
+        drawingDraft = null;
+        session.set("miette.dessin", null);
+        await refreshState();
+        location.hash = "#/";
+      } catch (error) {
+        toast(error.message, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
     async function toggleFavorite(id, button) {
       const next = button.getAttribute("aria-pressed") !== "true";
       try {
@@ -770,6 +871,10 @@
       else if (action === "pick") write({ enfants: ids.split(","), occasion: pendingOccasion });
       else if (action === "another") { if (lastRequest) write(lastRequest); }
       else if (action === "print-draft") print(id, true);
+      else if (action === "activity") makeDrawing({ genre: target.dataset.genre });
+      else if (action === "another-drawing") { if (lastDrawingRequest) makeDrawing(lastDrawingRequest); }
+      else if (action === "maze-level") makeDrawing({ genre: "labyrinthe", niveau: target.dataset.level });
+      else if (action === "print-drawing") printDrawing(id);
       else if (action === "reprint") print(id, false);
       else if (action === "fav") toggleFavorite(id, target);
       else if (action === "delete") remove(id);
@@ -797,7 +902,7 @@
     let previousSection = null;
     function route(scroll = true) {
       const { view, id } = parse();
-      document.body.classList.toggle("focus", view === "apercu" || view === "histoire");
+      document.body.classList.toggle("focus", view === "apercu" || view === "histoire" || view === "dessin");
       const section = current();
       // Arriver dans l'historique depuis un autre écran (« Relire » à l'accueil, un favori)
       // repart de toutes les histoires : un filtre oublié y cachait l'histoire ouverte.
@@ -812,6 +917,7 @@
       if (view !== "") pendingOccasion = null;
       if (view === "") renderHome();
       else if (view === "apercu") renderPreview();
+      else if (view === "dessin") renderDrawing();
       else if (view === "historique") renderHistory(null);
       else if (view === "histoire") (wide.matches ? renderHistory(id) : renderStory(id));
       else if (view === "reglages") renderSettings();

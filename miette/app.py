@@ -1,12 +1,17 @@
 """Serveur web de Miette : une page pour le téléphone, une API pour imprimer.
 
 Déroulé décidé le 2026-09-26 : choisir l'enfant (ou les deux), Surprise ou
-une occasion, lire l'aperçu, puis imprimer ou en demander une autre.
+une occasion, lire l'aperçu, puis imprimer ou en demander une autre. Depuis le
+2026-10-17, même déroulé pour les dessins (coloriage, imagier) et les jeux
+(labyrinthe, points à relier, cherche et trouve), et chaque histoire peut
+recevoir son illustration.
 """
 
 from __future__ import annotations
 
+import io
 import logging
+import random
 import threading
 import time
 from datetime import date
@@ -14,16 +19,29 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import claude, config, printer, story, ticket
-from .store import Store, StoredStory
+from PIL import Image
+
+from . import claude, config, drawing, printer, story, ticket
+from .generators import dot_to_dot, find_them, maze
+from .store import Store, StoredDrawing, StoredStory
 
 STATIC = Path(__file__).parent / "static"
 FONTS = Path(__file__).parent / "fonts"
 MAX_CHILDREN = 6
+
+ACTIVITIES = {
+    "coloriage": "Coloriage",
+    "imagier": "Imagier",
+    "labyrinthe": "Labyrinthe",
+    "points": "Points à relier",
+    "cherche": "Cherche et trouve",
+}
+# Le plus simple d'abord : les enfants ont 2 ans à l'automne 2026.
+MAZE_LEVELS = list(maze.LEVELS)
 
 log = logging.getLogger("miette")
 settings = config.load()
@@ -79,6 +97,11 @@ class StoryRequest(BaseModel):
     occasion: Literal["anniversaire", "fetes", "voyage", "premieres-fois"] | None = None
 
 
+class DrawingRequest(BaseModel):
+    genre: Literal["coloriage", "imagier", "labyrinthe", "points", "cherche"]
+    niveau: Literal["tout-petit", "facile", "moyen", "costaud"] | None = None
+
+
 def _names(ids: list[str]) -> str:
     by_id = {c["id"]: c["prenom"] for c in store.children()}
     names = [by_id.get(i, "") for i in ids]
@@ -98,7 +121,72 @@ def _public(entry: StoredStory) -> dict:
         "date": entry.created,
         "imprimee": entry.printed,
         "favori": entry.favorite,
+        "illustration": entry.illustration is not None,
     }
+
+
+def _drawing_title(entry: StoredDrawing) -> str:
+    if entry.kind == "labyrinthe":
+        return f"Labyrinthe {entry.subject}"
+    return f"{ACTIVITIES[entry.kind]} : {entry.subject}"
+
+
+def _public_drawing(entry: StoredDrawing) -> dict:
+    return {
+        "id": entry.id,
+        "genre": entry.kind,
+        "sujet": entry.subject,
+        "titre": _drawing_title(entry),
+        "date": entry.created,
+        "imprime": entry.printed,
+    }
+
+
+def _picture(svg: str) -> Image.Image:
+    return drawing.render(svg, ticket.TEXT_WIDTH)
+
+
+def _drawing_ticket(entry: StoredDrawing) -> Image.Image:
+    """Le ticket complet, recomposé à l'identique pour l'aperçu comme pour l'impression."""
+    day = date.fromisoformat(entry.created[:10])
+    if entry.kind == "coloriage":
+        return ticket.render_coloring(_picture(entry.svg), day)
+    if entry.kind == "imagier":
+        return ticket.render_picture_book(_picture(entry.svg), entry.subject, day)
+    if entry.kind == "labyrinthe":
+        sheet = maze.render(entry.subject, seed=entry.seed)
+    elif entry.kind == "points":
+        sheet = dot_to_dot.render(entry.subject)
+    else:
+        sheet, _ = find_them.render(entry.subject, seed=entry.seed)
+    return ticket.render_game(sheet.to_bilevel(), day)
+
+
+def _png(image: Image.Image, cache: str = "no-store") -> Response:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return Response(buffer.getvalue(), media_type="image/png", headers={"Cache-Control": cache})
+
+
+def _print(image: Image.Image) -> None:
+    """Imprime un ticket, un seul à la fois, après avoir vérifié la machine."""
+    if not printing.acquire(blocking=False):
+        raise HTTPException(409, "Un ticket est déjà en cours d'impression.")
+    try:
+        status = printer_status(fresh=True)
+        if not status.ready:
+            raise HTTPException(503, status.message)
+        try:
+            printer.print_image(settings.printer_host, settings.printer_port, image)
+        except printer.PrinterError as exc:
+            raise HTTPException(503, str(exc)) from exc
+    finally:
+        printing.release()
+
+
+def _check_daily_limit() -> None:
+    if store.written_today() >= settings.daily_limit:
+        raise HTTPException(429, f"Plafond de {settings.daily_limit} histoires et dessins par jour atteint.")
 
 
 @app.get("/", include_in_schema=False)
@@ -137,6 +225,8 @@ def state() -> dict:
         "enfants": [{"id": c["id"], "prenom": c["prenom"], "age": story.age_label(c, date.today())}
                     for c in store.children()],
         "occasions": story.OCCASIONS,
+        "activites": ACTIVITIES,
+        "niveaux": MAZE_LEVELS,
         "derniere": _public(last[0]) if last else None,
         "favoris": [_public(e) for e in store.printed(3, favorites_only=True)],
     }
@@ -191,8 +281,7 @@ def write_story(request: StoryRequest) -> dict:
     chosen = [by_id[i] for i in dict.fromkeys(request.enfants) if i in by_id]
     if not chosen:
         raise HTTPException(422, "Aucune fiche enfant ne correspond : les créer dans les réglages.")
-    if store.written_today() >= settings.daily_limit:
-        raise HTTPException(429, f"Plafond de {settings.daily_limit} histoires par jour atteint.")
+    _check_daily_limit()
 
     band, user = story.brief(chosen, request.occasion, store.recent_titles(), date.today())
     try:
@@ -208,24 +297,83 @@ def write_story(request: StoryRequest) -> dict:
     return _public(entry)
 
 
+@app.post("/api/histoires/{story_id}/illustration")
+def illustrate_story(story_id: str) -> dict:
+    """Dessine l'illustration d'une histoire déjà écrite, une fois pour toutes."""
+    entry = store.story(story_id)
+    if entry is None:
+        raise HTTPException(404, "Histoire introuvable.")
+    if entry.illustration is None:
+        try:
+            svg = drawing.draw(drawing.illustration_prompt(entry.title, entry.paragraphs),
+                               key=settings.anthropic_key, model=settings.model)
+        except claude.ClaudeError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        store.set_illustration(entry.id, svg)
+        log.info("histoire %s illustrée", entry.id)
+    return _public(store.story(entry.id))
+
+
+@app.get("/api/histoires/{story_id}/illustration.png", include_in_schema=False)
+def story_illustration(story_id: str) -> Response:
+    entry = store.story(story_id)
+    if entry is None or entry.illustration is None:
+        raise HTTPException(404, "Pas d'illustration.")
+    # Une illustration ne change plus une fois dessinée.
+    return _png(_picture(entry.illustration), "private, max-age=604800, immutable")
+
+
 @app.post("/api/histoires/{story_id}/imprimer")
 def print_story(story_id: str) -> dict:
     entry = store.story(story_id)
     if entry is None:
         raise HTTPException(404, "Histoire introuvable.")
-    if not printing.acquire(blocking=False):
-        raise HTTPException(409, "Un ticket est déjà en cours d'impression.")
-    try:
-        status = printer_status(fresh=True)
-        if not status.ready:
-            raise HTTPException(503, status.message)
-        image = ticket.render_raster(entry.title, tuple(entry.paragraphs),
-                                     _names(entry.children), date.fromisoformat(entry.created[:10]))
+    picture = _picture(entry.illustration) if entry.illustration else None
+    _print(ticket.render_raster(entry.title, tuple(entry.paragraphs), _names(entry.children),
+                                date.fromisoformat(entry.created[:10]), picture))
+    store.mark_printed(entry.id)
+    return _public(store.story(entry.id))
+
+
+@app.post("/api/dessins")
+def make_drawing(request: DrawingRequest) -> dict:
+    """Prépare un dessin ou un jeu en aperçu, sans l'imprimer."""
+    kind = request.genre
+    rng = random.Random()
+    if kind in ("coloriage", "imagier"):
+        _check_daily_limit()
+        subject = drawing.pick_subject(store.recent_subjects(("coloriage", "imagier")), rng)
+        prompt = drawing.coloring_prompt(subject) if kind == "coloriage" else drawing.picture_prompt(subject)
         try:
-            printer.print_image(settings.printer_host, settings.printer_port, image)
-        except printer.PrinterError as exc:
-            raise HTTPException(503, str(exc)) from exc
-        store.mark_printed(entry.id)
-        return _public(store.story(entry.id))
-    finally:
-        printing.release()
+            svg = drawing.draw(prompt, key=settings.anthropic_key, model=settings.model)
+        except claude.ClaudeError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        entry = store.add_drawing(kind=kind, subject=subject, svg=svg)
+    elif kind == "labyrinthe":
+        entry = store.add_drawing(kind=kind, subject=request.niveau or MAZE_LEVELS[0],
+                                  seed=rng.randrange(1 << 31))
+    else:
+        shapes = list(dot_to_dot.SHAPES)
+        recent = store.recent_subjects((kind,), count=len(shapes) - 1)
+        subject = rng.choice([s for s in shapes if s not in recent] or shapes)
+        entry = store.add_drawing(kind=kind, subject=subject, seed=rng.randrange(1 << 31))
+    log.info("%s %s préparé : %s", kind, entry.id, entry.subject)
+    return _public_drawing(entry)
+
+
+@app.get("/api/dessins/{drawing_id}.png", include_in_schema=False)
+def drawing_image(drawing_id: str) -> Response:
+    entry = store.drawing(drawing_id)
+    if entry is None:
+        raise HTTPException(404, "Dessin introuvable.")
+    return _png(_drawing_ticket(entry), "private, max-age=604800, immutable")
+
+
+@app.post("/api/dessins/{drawing_id}/imprimer")
+def print_drawing(drawing_id: str) -> dict:
+    entry = store.drawing(drawing_id)
+    if entry is None:
+        raise HTTPException(404, "Dessin introuvable.")
+    _print(_drawing_ticket(entry))
+    store.mark_drawing_printed(entry.id)
+    return _public_drawing(store.drawing(entry.id))
