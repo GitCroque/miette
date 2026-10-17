@@ -32,8 +32,9 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
   (un sujet du quotidien tiré au sort, avec son nom en grand pour l'imagier),
   labyrinthe en quatre niveaux, points à relier, cherche et trouve. L'aperçu
   montre le ticket exact, rendu par le serveur en noir et blanc.
-- Un plafond quotidien d'histoires et de dessins écrits par le modèle protège
-  contre un bouton qui s'emballe. Les jeux, calculés sur place, n'y comptent pas.
+- Un plafond quotidien d'histoires et de coloriages peut être posé contre un
+  bouton qui s'emballe (`MIETTE_LIMITE_JOUR`) ; il n'y en a pas par défaut. Les
+  jeux, calculés sur place, n'y comptent jamais.
 
 ## Matériel
 
@@ -53,7 +54,7 @@ sérialise tous ses accès et garde l'état affiché quelques secondes en cache.
 | `MIETTE_IMPRIMANTE_PORT` | Port ESC/POS brut | `9100` |
 | `ANTHROPIC_API_KEY` | Clé de l'API Anthropic | aucun, obligatoire |
 | `MIETTE_MODELE` | Modèle Claude | `claude-opus-5-5` |
-| `MIETTE_LIMITE_JOUR` | Nombre maximal d'histoires générées par jour | `20` |
+| `MIETTE_LIMITE_JOUR` | Plafond quotidien d'histoires et de coloriages | aucun : pas de plafond |
 | `MIETTE_DONNEES` | Dossier de la base (fiches et histoires) | `/data` dans l'image |
 
 Les dessins sont écrits par le même modèle, en SVG (effort moyen), puis

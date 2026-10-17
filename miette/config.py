@@ -14,7 +14,7 @@ class Settings:
     anthropic_key: str
     model: str
     data_dir: Path
-    daily_limit: int
+    daily_limit: int | None
 
 
 def load() -> Settings:
@@ -24,5 +24,7 @@ def load() -> Settings:
         anthropic_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),
         model=os.environ.get("MIETTE_MODELE", "claude-opus-5-5"),
         data_dir=Path(os.environ.get("MIETTE_DONNEES", "data")),
-        daily_limit=int(os.environ.get("MIETTE_LIMITE_JOUR", "20")),
+        # Pas de plafond par défaut depuis le 2026-10-17 (décision de Julien) :
+        # la variable reste là pour en poser un si la dépense s'emballe.
+        daily_limit=int(limit) if (limit := os.environ.get("MIETTE_LIMITE_JOUR", "").strip()) else None,
     )

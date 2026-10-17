@@ -196,7 +196,7 @@ def _print(image: Image.Image) -> None:
 
 
 def _check_daily_limit() -> None:
-    if store.written_today() >= settings.daily_limit:
+    if settings.daily_limit is not None and store.written_today() >= settings.daily_limit:
         raise HTTPException(429, f"Plafond de {settings.daily_limit} histoires et dessins par jour atteint.")
 
 
@@ -232,7 +232,7 @@ def state() -> dict:
         "prete": status.ready,
         "papier_bas": status.paper_low,
         "cle": bool(settings.anthropic_key),
-        "restantes": max(0, settings.daily_limit - store.written_today()),
+        "restantes": None if settings.daily_limit is None else max(0, settings.daily_limit - store.written_today()),
         "enfants": [{"id": c["id"], "prenom": c["prenom"], "age": story.age_label(c, date.today())}
                     for c in store.children()],
         "occasions": story.OCCASIONS,

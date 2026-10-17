@@ -1,3 +1,4 @@
+import dataclasses
 import importlib
 import io
 
@@ -40,7 +41,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(drawing, "draw", fake_draw)
     test_client = TestClient(app_module.app)
     test_client.printed, test_client.briefs, test_client.prompts = printed, briefs, prompts
-    test_client.store = app_module.store
+    test_client.store, test_client.module = app_module.store, app_module
     return test_client
 
 
@@ -305,3 +306,19 @@ def test_picture_book_pages_printed_before_the_merge_still_show(client):
     item = client.get("/api/historique").json()[0]
     assert item["titre"] == "Imagier : la vache"
     assert client.get(f"/api/dessins/{old.id}.png").status_code == 200
+
+
+def test_no_daily_limit_unless_one_is_set(client, monkeypatch):
+    monkeypatch.setattr(client.module, "settings", dataclasses.replace(client.module.settings, daily_limit=None))
+    lou, = _children(client, LOU)
+    for _ in range(5):
+        assert client.post("/api/histoires", json={"enfants": [lou]}).status_code == 200
+    assert client.get("/api/etat").json()["restantes"] is None
+
+
+def test_daily_limit_setting(monkeypatch):
+    from miette import config
+    monkeypatch.delenv("MIETTE_LIMITE_JOUR", raising=False)
+    assert config.load().daily_limit is None
+    monkeypatch.setenv("MIETTE_LIMITE_JOUR", "12")
+    assert config.load().daily_limit == 12

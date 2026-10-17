@@ -493,8 +493,10 @@
       $("#top-status").innerHTML = `<span class="txt">${esc(etat.imprimante.replace(/\.$/, ""))}</span>`;
       $("#side-status").className = "state " + level;
       $("#side-status").textContent = etat.prete && !etat.papier_bas ? "Imprimante prête" : etat.imprimante;
-      const plural = etat.restantes > 1 ? "s" : "";
-      $("#side-remaining").textContent = `${etat.restantes} histoire${plural} ou dessin${plural} encore possible${plural} aujourd'hui`;
+      // Le décompte n'existe que si un plafond quotidien est posé (MIETTE_LIMITE_JOUR).
+      const left = etat.restantes, plural = left > 1 ? "s" : "";
+      $("#side-remaining").hidden = left === null;
+      $("#side-remaining").textContent = left === null ? "" : `${left} histoire${plural} ou coloriage${plural} encore possible${plural} aujourd'hui`;
       return etat;
     }
     function statusPill() {
