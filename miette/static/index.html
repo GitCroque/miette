@@ -189,7 +189,11 @@
       .kid .name b, .kid.together .name b { font-size: 24px; }
     }
 
-    .occasions, .activities { margin-top: 22px; }
+    .occasions, .activities, .asking { margin-top: 22px; }
+    .ask { display: flex; gap: 8px; }
+    .ask input { flex: 1; min-width: 0; height: 50px; padding: 0 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; }
+    .ask input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .ask .btn { flex: none; height: 50px; }
     .occ-row { display: flex; gap: 8px; overflow-x: auto; margin: 0 -20px; padding: 0 20px; scrollbar-width: none; }
     .occ-row::-webkit-scrollbar { display: none; }
     .occ { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 700; font-size: 15px; }
@@ -410,6 +414,7 @@
     const illustrationTried = new Set();
     let pendingOccasion = null;
     let pendingColoring = false;
+    let askDraft = "";
     let historyItems = null;
     let historyFilter = "toutes";
     let settingsDrafts = [];
@@ -465,10 +470,10 @@
       return day.charAt(0).toUpperCase() + day.slice(1) + " " + part;
     }
     function metaLine(story) {
-      return [story.pour, story.occasion && etat ? etat.occasions[story.occasion] : "", whenLabel(story.imprimee || story.date)].filter(Boolean).join(" · ");
+      return [story.pour, story.occasion && etat ? etat.occasions[story.occasion] : "", story.theme, whenLabel(story.imprimee || story.date)].filter(Boolean).join(" · ");
     }
     function readerMeta(item) {
-      return [item.pour, longDate(item.imprimee || item.date), item.occasion && etat ? etat.occasions[item.occasion] : ""].filter(Boolean).join(" · ");
+      return [item.pour, longDate(item.imprimee || item.date), item.occasion && etat ? etat.occasions[item.occasion] : "", item.theme].filter(Boolean).join(" · ");
     }
     // L'historique mêle histoires et dessins : chaque action vise la bonne collection.
     function apiBase(kind) { return kind === "dessin" ? "/api/dessins" : "/api/histoires"; }
@@ -545,6 +550,10 @@
           <span class="surprise">${icon("sparkle", 16)}Surprise</span></button>`;
       }
       html += "</div>";
+
+      html += `<section class="asking"><h2 class="label">Une demande précise</h2>
+        <form class="ask" data-form="ask"><input id="ask-input" type="text" maxlength="200" value="${esc(askDraft)}" placeholder="Un coloriage de poule, une histoire sur la tétine…" autocomplete="off" enterkeyhint="send" aria-label="Demande à Miette">
+        <button class="btn dark" type="submit">${icon("sparkle", 18)}Demander</button></form></section>`;
 
       html += '<section class="occasions"><h2 class="label">Une occasion</h2><div class="occ-row">';
       for (const [key, label] of Object.entries(etat.occasions)) {
@@ -623,7 +632,7 @@
       view.innerHTML = `<div class="view-head"><div class="titles"><a class="round" href="#/" aria-label="Retour à l'accueil">${icon("back", 20)}</a>
           <div><b>Aperçu</b><small>Rien n'est encore imprimé</small></div></div></div>
         <article class="sheet"><div class="chips"><span class="chip accent">Pour ${esc(draft.pour)}</span>
-          <span class="chip">${occasion ? icon(draft.occasion, 14) + esc(occasion) : icon("sparkle", 14) + "Surprise"}</span></div>
+          <span class="chip">${occasion ? icon(draft.occasion, 14) + esc(occasion) : draft.theme ? icon("sparkle", 14) + esc(draft.theme) : icon("sparkle", 14) + "Surprise"}</span></div>
           ${pictureHtml(draft)}<h1 class="story-title">${esc(draft.titre)}</h1><div class="story">${paragraphs(draft.texte)}</div></article>
         <div class="actionbar" style="max-width:760px"><button class="btn big-btn" data-action="another">${icon("again", 18)}Une autre</button>
           <button class="btn big-btn primary grow" data-action="print-draft" data-id="${esc(draft.id)}"${illustrating === draft.id ? " disabled" : ""}>${icon("printer", 20)}${illustrating === draft.id ? "Illustration en cours" : "Imprimer"}</button></div>`;
@@ -815,6 +824,34 @@
       }
     }
 
+    // Demande en clair : Miette la range (histoire ou coloriage) puis montre l'aperçu habituel.
+    async function ask(text) {
+      if (busy || !text) return;
+      setBusy(true, "Miette s'y met…");
+      try {
+        const answer = await api("POST", "/api/demande", { texte: text });
+        askDraft = "";
+        if (answer.genre === "histoire") {
+          draft = answer.resultat;
+          lastRequest = answer.requete;
+          session.set("miette.apercu", draft);
+          session.set("miette.demande", lastRequest);
+          location.hash = "#/apercu";
+        } else {
+          drawingDraft = answer.resultat;
+          lastDrawingRequest = answer.requete;
+          session.set("miette.dessin", drawingDraft);
+          session.set("miette.dessin.demande", lastDrawingRequest);
+          location.hash = "#/dessin";
+        }
+      } catch (error) {
+        toast(error.message, true);
+      } finally {
+        setBusy(false);
+        refreshState();
+      }
+    }
+
     async function printDrawing(id) {
       if (busy) return;
       setBusy(true, "Impression…");
@@ -910,8 +947,14 @@
       else if (action === "accord") { settingsDrafts[Number(index)].accord = target.dataset.value; renderSettingsForms(); }
       else if (action === "save") saveSettings();
     });
+    document.addEventListener("submit", (event) => {
+      if (event.target.dataset.form !== "ask") return;
+      event.preventDefault();
+      ask($("#ask-input").value.trim());
+    });
     document.addEventListener("input", (event) => {
       const el = event.target;
+      if (el.id === "ask-input") askDraft = el.value;
       if (el.dataset && el.dataset.field) settingsDrafts[Number(el.dataset.index)][el.dataset.field] = el.value;
     });
 
@@ -954,7 +997,7 @@
     window.addEventListener("hashchange", () => route(true));
     wide.addEventListener("change", () => route(false));
     refreshState().then(() => route(true));
-    setInterval(() => { if (!busy && !document.hidden) refreshState().then(() => { if (current() === "accueil" && !pendingOccasion && !pendingColoring) renderHome(); }); }, 30000);
+    setInterval(() => { if (!busy && !document.hidden) refreshState().then(() => { if (current() === "accueil" && !pendingOccasion && !pendingColoring && document.activeElement?.id !== "ask-input") renderHome(); }); }, 30000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshState(); });
   </script>
 </body>

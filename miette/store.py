@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS histoires (
     imprimee TEXT,
     favori INTEGER NOT NULL DEFAULT 0,
     supprimee TEXT,
-    illustration TEXT
+    illustration TEXT,
+    theme TEXT
 );
 CREATE TABLE IF NOT EXISTS dessins (
     id TEXT PRIMARY KEY,
@@ -61,6 +62,7 @@ LATER_COLUMNS = {
         "favori": "INTEGER NOT NULL DEFAULT 0",
         "supprimee": "TEXT",
         "illustration": "TEXT",
+        "theme": "TEXT",
     },
     "dessins": {
         "favori": "INTEGER NOT NULL DEFAULT 0",
@@ -85,6 +87,7 @@ class StoredStory:
     printed: str | None
     favorite: bool = False
     illustration: str | None = None
+    theme: str | None = None
 
 
 @dataclass(frozen=True)
@@ -136,19 +139,20 @@ class Store:
     # Carnet
 
     def add_story(self, *, children: list[str], occasion: str | None, title: str,
-                  paragraphs: tuple[str, ...], model: str, words: int) -> StoredStory:
+                  paragraphs: tuple[str, ...], model: str, words: int,
+                  theme: str | None = None) -> StoredStory:
         story = StoredStory(
             id=uuid.uuid4().hex[:12],
             created=datetime.now().isoformat(timespec="seconds"),
             children=children, occasion=occasion, title=title,
-            paragraphs=list(paragraphs), model=model, words=words, printed=None,
+            paragraphs=list(paragraphs), model=model, words=words, printed=None, theme=theme,
         )
         with self._lock:
             self._db.execute(
-                "INSERT INTO histoires (id, cree, enfants, occasion, titre, paragraphes, modele, mots) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO histoires (id, cree, enfants, occasion, titre, paragraphes, modele, mots, theme) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (story.id, story.created, json.dumps(children, ensure_ascii=False), occasion,
-                 title, json.dumps(story.paragraphs, ensure_ascii=False), model, words),
+                 title, json.dumps(story.paragraphs, ensure_ascii=False), model, words, theme),
             )
             self._db.commit()
         return story
@@ -278,7 +282,7 @@ def _story(row: sqlite3.Row) -> StoredStory:
         occasion=row["occasion"], title=row["titre"],
         paragraphs=json.loads(row["paragraphes"]), model=row["modele"],
         words=row["mots"], printed=row["imprimee"], favorite=bool(row["favori"]),
-        illustration=row["illustration"],
+        illustration=row["illustration"], theme=row["theme"],
     )
 
 

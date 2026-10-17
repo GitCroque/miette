@@ -23,6 +23,7 @@ def test_a_first_version_database_is_migrated(tmp_path):
     store = Store(tmp_path)
     old = store.story("abc")
     assert old.title == "Ancienne" and old.favorite is False and old.illustration is None
+    assert old.theme is None
     store.set_favorite("abc", True)
     assert [s.id for s in store.printed(favorites_only=True)] == ["abc"]
     new = store.add_story(children=["x"], occasion=None, title="Nouvelle",

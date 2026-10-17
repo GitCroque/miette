@@ -26,6 +26,9 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
 - Fiches et histoires vivent dans une base SQLite sur le volume (`miette.db`) :
   une histoire se réimprime sans nouvel appel au modèle, et les titres récents
   sont écartés pour éviter les redites.
+- Un champ libre accepte une demande en clair (« un coloriage de poule », « une
+  histoire sur la tétine pour Noa ») : Claude la range d'abord en histoire à
+  thème ou en coloriage d'un sujet précis, puis le déroulé habituel reprend.
 - Chaque histoire reçoit une illustration, dessinée après le texte pendant
   qu'on lit l'aperçu, puis imprimée au-dessus du titre.
 - Des dessins et des jeux, chacun sur son propre ticket : coloriage et imagier

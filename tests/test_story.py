@@ -168,3 +168,10 @@ def test_two_girls_are_agreed_in_the_feminine():
 def test_mixed_children_are_agreed_in_the_masculine():
     _, user = story.brief([LOU, MAX], None, [], TODAY, random.Random(0))
     assert "« ils »" in user
+
+
+def test_a_requested_theme_replaces_the_drawn_situation():
+    for seed in range(20):
+        _, user = story.brief([LOU], None, [], TODAY, random.Random(seed), theme="la tétine")
+        assert "Thème demandé par les parents : la tétine" in user
+        assert "Situation :" not in user and "autre personnage" not in user

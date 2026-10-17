@@ -4,7 +4,8 @@ Déroulé décidé le 2026-09-26 : choisir l'enfant (ou les deux), Surprise ou
 une occasion, lire l'aperçu, puis imprimer ou en demander une autre. Depuis le
 2026-10-17, même déroulé pour les coloriages (par thème, avec le nom du sujet
 en grand : l'ancien imagier y est fondu) et les jeux (labyrinthe, points à
-relier, cherche et trouve), et chaque histoire peut recevoir son illustration.
+relier, cherche et trouve), et chaque histoire peut recevoir son illustration. Un champ libre accepte aussi une demande en clair
+(« un coloriage de poule », « une histoire sur la tétine »).
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from PIL import Image
 
-from . import claude, config, drawing, printer, story, ticket
+from . import claude, config, demande, drawing, printer, story, ticket
 from .generators import dot_to_dot, find_them, maze
 from .store import Store, StoredDrawing, StoredStory
 
@@ -96,12 +97,19 @@ class Favorite(BaseModel):
 class StoryRequest(BaseModel):
     enfants: list[str] = Field(min_length=1, max_length=MAX_CHILDREN)
     occasion: Literal["anniversaire", "fetes", "voyage", "premieres-fois"] | None = None
+    theme: str | None = Field(None, max_length=demande.MAX_THEME)
 
 
 class DrawingRequest(BaseModel):
     genre: Literal["coloriage", "labyrinthe", "points", "cherche"]
     niveau: Literal["tout-petit", "facile", "moyen", "costaud"] | None = None
     categorie: Literal["animaux", "vehicules", "maison", "nature", "a-manger"] | None = None
+    # Sujet précis, venu d'une demande libre : il remplace le tirage au sort.
+    sujet: str | None = Field(None, max_length=demande.MAX_SUBJECT)
+
+
+class FreeRequest(BaseModel):
+    texte: str = Field(min_length=2, max_length=200)
 
 
 def _names(ids: list[str]) -> str:
@@ -121,6 +129,7 @@ def _public(entry: StoredStory) -> dict:
         "texte": "\n\n".join(entry.paragraphs),
         "pour": _names(entry.children),
         "occasion": entry.occasion,
+        "theme": entry.theme,
         "date": entry.created,
         "imprimee": entry.printed,
         "favori": entry.favorite,
@@ -310,7 +319,8 @@ def write_story(request: StoryRequest) -> dict:
         raise HTTPException(422, "Aucune fiche enfant ne correspond : les créer dans les réglages.")
     _check_daily_limit()
 
-    band, user = story.brief(chosen, request.occasion, store.recent_titles(), date.today())
+    band, user = story.brief(chosen, request.occasion, store.recent_titles(), date.today(),
+                             theme=request.theme)
     try:
         written = story.write(story.system_prompt(band), user, band,
                               key=settings.anthropic_key, model=settings.model)
@@ -319,7 +329,7 @@ def write_story(request: StoryRequest) -> dict:
 
     entry = store.add_story(children=[c["id"] for c in chosen], occasion=request.occasion,
                             title=written.title, paragraphs=written.paragraphs,
-                            model=settings.model, words=written.words)
+                            model=settings.model, words=written.words, theme=request.theme)
     log.info("histoire %s écrite : %s (%d mots, %s)", entry.id, entry.title, entry.words, band.label)
     return _public(entry)
 
@@ -369,7 +379,8 @@ def make_drawing(request: DrawingRequest) -> dict:
     rng = random.Random()
     if kind == "coloriage":
         _check_daily_limit()
-        subject = drawing.pick_subject(store.recent_subjects(("coloriage", "imagier")), request.categorie, rng)
+        subject = request.sujet or drawing.pick_subject(
+            store.recent_subjects(("coloriage", "imagier")), request.categorie, rng)
         try:
             svg = drawing.draw(drawing.coloring_prompt(subject), key=settings.anthropic_key, model=settings.model)
         except claude.ClaudeError as exc:
@@ -385,6 +396,33 @@ def make_drawing(request: DrawingRequest) -> dict:
         entry = store.add_drawing(kind=kind, subject=subject, seed=rng.randrange(1 << 31))
     log.info("%s %s préparé : %s", kind, entry.id, entry.subject)
     return _public_drawing(entry)
+
+
+@app.post("/api/demande")
+def free_request(request: FreeRequest) -> dict:
+    """Comprend une demande en clair, puis prépare l'histoire ou le coloriage en aperçu.
+
+    Rend aussi la requête reconstituée : « Une autre » rejoue le même thème.
+    """
+    children = store.children()
+    try:
+        understood = demande.understand(request.texte.strip(), [c["prenom"] for c in children],
+                                        key=settings.anthropic_key, model=settings.model)
+    except demande.DemandeError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except claude.ClaudeError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    log.info("demande libre rangée : %s, %s", understood.kind, understood.subject or understood.theme)
+
+    if understood.kind == "coloriage":
+        drawn = DrawingRequest(genre="coloriage", sujet=understood.subject)
+        return {"genre": "dessin", "requete": drawn.model_dump(exclude_none=True), "resultat": make_drawing(drawn)}
+    # Aucun prénom cité : l'histoire est pour tous les enfants des fiches.
+    ids = [c["id"] for c in children if c["prenom"] in understood.children] or [c["id"] for c in children]
+    if not ids:
+        raise HTTPException(422, "Aucune fiche enfant : les créer dans les réglages.")
+    told = StoryRequest(enfants=ids, theme=understood.theme or None)
+    return {"genre": "histoire", "requete": told.model_dump(exclude_none=True), "resultat": write_story(told)}
 
 
 @app.get("/api/dessins/{drawing_id}.png", include_in_schema=False)

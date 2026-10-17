@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from miette import drawing, printer, story
+from miette import demande, drawing, printer, story
 
 LOU = {"prenom": "Lou", "naissance": "2024-10", "accord": "elle", "doudou": "Lapinou"}
 MAX = {"prenom": "Max", "naissance": "2024-12", "accord": "il"}
@@ -28,6 +28,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(printer, "print_image", lambda host, port, image: printed.append(image))
 
     def fake_write(system, user, band, key, model):
+        test_client.last_brief = user
         briefs.append(user)
         return story.Story(f"Histoire {len(briefs)}", ("Un paragraphe.", "Un autre."))
 
@@ -322,3 +323,44 @@ def test_daily_limit_setting(monkeypatch):
     assert config.load().daily_limit is None
     monkeypatch.setenv("MIETTE_LIMITE_JOUR", "12")
     assert config.load().daily_limit == 12
+
+
+def _understood(monkeypatch, result):
+    monkeypatch.setattr(demande, "understand", lambda text, names, key, model: result)
+
+
+def test_a_free_request_for_a_story_keeps_its_theme(client, monkeypatch):
+    _, max_ = _children(client, LOU, MAX)
+    _understood(monkeypatch, demande.Demande("histoire", "", "la tétine", ["Max"]))
+    answer = client.post("/api/demande", json={"texte": "une histoire sur la tétine pour Max"}).json()
+    assert answer["genre"] == "histoire" and answer["requete"] == {"enfants": [max_], "theme": "la tétine"}
+    assert answer["resultat"]["pour"] == "Max" and answer["resultat"]["theme"] == "la tétine"
+    assert "la tétine" in client.last_brief
+    # « Une autre » rejoue la requête rendue : même thème, même enfant.
+    again = client.post("/api/histoires", json=answer["requete"]).json()
+    assert again["theme"] == "la tétine"
+
+
+def test_a_free_request_without_names_is_for_every_child(client, monkeypatch):
+    _children(client, LOU, MAX)
+    _understood(monkeypatch, demande.Demande("histoire", "", "", []))
+    answer = client.post("/api/demande", json={"texte": "une histoire"}).json()
+    assert answer["resultat"]["pour"] == "Lou et Max" and answer["resultat"]["theme"] is None
+
+
+def test_a_free_request_for_a_coloring_draws_that_subject(client, monkeypatch):
+    _understood(monkeypatch, demande.Demande("coloriage", "la poule", "", []))
+    answer = client.post("/api/demande", json={"texte": "un coloriage d'une poule"}).json()
+    assert answer["genre"] == "dessin" and answer["requete"] == {"genre": "coloriage", "sujet": "la poule"}
+    assert answer["resultat"]["titre"] == "Coloriage : la poule"
+    assert "poule" in client.prompts[0]
+
+
+def test_a_free_request_miette_cannot_do_is_explained(client, monkeypatch):
+    def refuse(text, names, key, model):
+        raise demande.DemandeError("Miette sait faire une histoire ou un coloriage : reformuler la demande.")
+
+    monkeypatch.setattr(demande, "understand", refuse)
+    response = client.post("/api/demande", json={"texte": "la météo"})
+    assert response.status_code == 422 and "reformuler" in response.json()["detail"]
+    assert client.post("/api/demande", json={"texte": ""}).status_code == 422

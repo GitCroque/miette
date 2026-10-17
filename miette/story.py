@@ -133,7 +133,8 @@ def _next_birthday_age(child: dict, today: date) -> int | None:
 
 
 def brief(children: list[dict], occasion: str | None, recent_titles: list[str],
-          today: date, rng: random.Random | None = None) -> tuple[Band, str]:
+          today: date, rng: random.Random | None = None,
+          theme: str | None = None) -> tuple[Band, str]:
     """Choisit la tranche d'âge et compose la demande faite au modèle."""
     rng = rng or random.Random()
     months = [m for m in (age_in_months(c.get("naissance", ""), today) for c in children) if m is not None]
@@ -160,7 +161,8 @@ def brief(children: list[dict], occasion: str | None, recent_titles: list[str],
         age = age_label(child, today)
         who = f"{child['prenom']}, {'une petite fille' if girl else 'un petit garçon'}"
         who += f" de {age}" if age else ""
-        if occasion is None and rng.random() < 0.35:
+        # Un thème demandé par les parents garde l'enfant pour héros.
+        if occasion is None and not theme and rng.random() < 0.35:
             candidates = [child[k] for k in ("doudou", "animaux") if child.get(k, "").strip()]
             other = rng.choice(candidates + list(OTHER_HEROES))
             lines.append(f"Cette fois, le héros est un autre personnage : {other}. "
@@ -178,6 +180,9 @@ def brief(children: list[dict], occasion: str | None, recent_titles: list[str],
         lines.append(f"Occasion : {rng.choice(TRIPS)}.")
     elif occasion == "premieres-fois":
         lines.append(f"Occasion : {rng.choice(FIRSTS)}.")
+    elif theme:
+        lines.append(f"Thème demandé par les parents : {theme}. L'histoire tourne autour de ce thème, "
+                     "avec douceur.")
     else:
         lines.append(f"Situation : {rng.choice(SITUATIONS)}.")
         if rng.random() < 0.6:
