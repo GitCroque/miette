@@ -3,8 +3,12 @@
 Les contraintes de l'imprimante thermique commandent tout le reste :
 
 - 1 bit strict, noir ou blanc, aucun niveau de gris ;
-- 203 dpi, soit 8 points par millimètre ;
-- 576 points utiles en largeur sur un rouleau de 80 mm.
+- 180 dpi, soit 7 points par millimètre ;
+- 512 points utiles en largeur sur un rouleau de 80 mm.
+
+Les deux valeurs ont été mesurées sur la TM-T88VI le 2026-09-26 (voir
+ticket.py). Les générateurs, écrits avant l'arrivée de la machine, visaient
+576 points à 203 dpi : la machine tronque sans prévenir tout ce qui dépasse.
 
 On dessine en niveaux de gris à une échelle supérieure, puis on réduit et on
 seuille. Dessiner directement en 1 bit crénellerait les courbes. Le tramage
@@ -14,12 +18,13 @@ transforme un trait propre en nuage de points.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-WIDTH_DOTS = 576
-DOTS_PER_MM = 8
+WIDTH_DOTS = 512
+DOTS_PER_MM = 7
 MARGIN = 16
 SUPERSAMPLE = 4
 THRESHOLD = 128
@@ -28,16 +33,10 @@ MIN_STROKE = 3
 WHITE = 255
 BLACK = 0
 
-# Cherchées dans l'ordre. Les premières sont sur le Mac de développement, les
-# DejaVu seront celles du conteneur Linux. Le repli Pillow évite un crash mais
-# donne un rendu médiocre : si on y arrive, c'est qu'il faut embarquer une
-# police dans l'image Docker.
-FONT_CANDIDATES = (
-    "/System/Library/Fonts/Supplemental/Arial Rounded Bold.ttf",
-    "/System/Library/Fonts/Supplemental/Verdana Bold.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
-)
+# La police ronde embarquée pour les histoires : l'image Docker n'a aucune
+# police système, et les jeux doivent parler comme les histoires.
+FONT = Path(__file__).parent / "fonts" / "Fredoka.ttf"
+FONT_WEIGHT = 600
 
 
 def mm(value: float) -> int:
@@ -45,13 +44,13 @@ def mm(value: float) -> int:
     return round(value * DOTS_PER_MM)
 
 
+@lru_cache(maxsize=16)
 def load_font(size_dots: int) -> ImageFont.FreeTypeFont:
-    """Charge une police à la taille demandée, exprimée en points finaux."""
-    scaled = size_dots * SUPERSAMPLE
-    for candidate in FONT_CANDIDATES:
-        if Path(candidate).is_file():
-            return ImageFont.truetype(candidate, scaled)
-    return ImageFont.load_default(size=scaled)
+    """Charge la police à la taille demandée, exprimée en points finaux."""
+    loaded = ImageFont.truetype(str(FONT), size_dots * SUPERSAMPLE)
+    axes = loaded.get_variation_axes()
+    loaded.set_variation_by_axes([FONT_WEIGHT if i == 0 else a["default"] for i, a in enumerate(axes)])
+    return loaded
 
 
 class Sheet:

@@ -1,6 +1,7 @@
 from datetime import date
 
 from miette import ticket
+from miette.generators import dot_to_dot, find_them, maze
 
 PARAGRAPHS = (
     "Lou se réveille. Dehors, il pleut très fort sur le toit de la maison.",
@@ -49,3 +50,11 @@ def test_typeset_keeps_punctuation_with_its_word():
     text = ticket.typeset("Le petit chat saute très haut dans le ciel bleu et dit : bonjour !")
     for width in range(120, 480, 7):
         assert not any(line.startswith(("!", ":", "»")) for line in ticket.wrap(text, face, width))
+
+
+def test_games_are_drawn_at_printer_width():
+    sheets = [maze.render(level, seed=1) for level in maze.LEVELS]
+    sheets += [dot_to_dot.render(shape) for shape in dot_to_dot.SHAPES]
+    sheets.append(find_them.render("étoile", seed=1)[0])
+    for sheet in sheets:
+        assert sheet.width == ticket.WIDTH
