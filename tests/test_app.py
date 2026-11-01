@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from miette import demande, drawing, printer, story
+from miette import demande, drawing, images, printer, story
 
 LOU = {"prenom": "Lou", "naissance": "2024-10", "accord": "elle", "doudou": "Lapinou"}
 MAX = {"prenom": "Max", "naissance": "2024-12", "accord": "il"}
@@ -364,3 +364,40 @@ def test_a_free_request_miette_cannot_do_is_explained(client, monkeypatch):
     response = client.post("/api/demande", json={"texte": "la météo"})
     assert response.status_code == 422 and "reformuler" in response.json()["detail"]
     assert client.post("/api/demande", json={"texte": ""}).status_code == 422
+
+
+def _with_openrouter(client, monkeypatch):
+    monkeypatch.setattr(client.module, "settings", dataclasses.replace(
+        client.module.settings, openrouter_key="cle-openrouter", coloring_model="microsoft/mai-image-2.6"))
+
+
+def test_coloring_comes_from_the_image_model_when_there_is_a_key(client, monkeypatch):
+    _with_openrouter(client, monkeypatch)
+    asked = []
+
+    def fake_image(prompt, key, model, width):
+        asked.append((prompt, key, model))
+        return Image.new("1", (width, 300), 1)
+
+    monkeypatch.setattr(images, "draw", fake_image)
+    data = client.post("/api/dessins", json={"genre": "coloriage", "sujet": "la poule"}).json()
+    assert asked == [(images.coloring_prompt("la poule"), "cle-openrouter", "microsoft/mai-image-2.6")]
+    assert client.prompts == []  # Claude n'a rien dessiné
+    stored = client.store.drawing(data["id"])
+    assert stored.image and stored.svg is None
+    assert client.get(f"/api/dessins/{data['id']}.png").headers["content-type"] == "image/png"
+    assert client.post(f"/api/dessins/{data['id']}/imprimer").status_code == 200
+    # Le dessin gardé passe tel quel sur le ticket, sous le titre et au-dessus du nom.
+    assert client.printed[-1].height > 300
+
+
+def test_coloring_falls_back_to_claude_when_the_image_model_fails(client, monkeypatch):
+    _with_openrouter(client, monkeypatch)
+
+    def outage(prompt, key, model, width):
+        raise images.ImageError("OpenRouter injoignable : URLError.")
+
+    monkeypatch.setattr(images, "draw", outage)
+    data = client.post("/api/dessins", json={"genre": "coloriage", "sujet": "la poule"}).json()
+    assert len(client.prompts) == 1 and "poule" in client.prompts[0]
+    assert client.store.drawing(data["id"]).svg == CIRCLE

@@ -1,4 +1,7 @@
-"""Dessins au trait écrits par Claude en SVG : coloriage et illustration.
+"""Dessins au trait écrits par Claude en SVG : illustration, et coloriage de repli.
+
+Depuis le 2026-11-01, les coloriages viennent d'un modèle d'image quand une clé
+OpenRouter est posée (voir images.py) ; Claude les dessine encore sans elle.
 
 Essai du 2026-10-17 avec Opus 5.5 en effort moyen : un sujet seul (chat,
 voiture, maison) sort net et reconnaissable pour 1,4 à 2,7 centimes, en 7 à

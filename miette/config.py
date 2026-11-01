@@ -13,6 +13,8 @@ class Settings:
     printer_port: int
     anthropic_key: str
     model: str
+    openrouter_key: str
+    coloring_model: str
     data_dir: Path
     daily_limit: int | None
 
@@ -23,6 +25,9 @@ def load() -> Settings:
         printer_port=int(os.environ.get("MIETTE_IMPRIMANTE_PORT", "9100")),
         anthropic_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),
         model=os.environ.get("MIETTE_MODELE", "claude-opus-5-5"),
+        # Sans clé OpenRouter, les coloriages restent dessinés par Claude en SVG.
+        openrouter_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
+        coloring_model=os.environ.get("MIETTE_MODELE_COLORIAGE", "microsoft/mai-image-2.6"),
         data_dir=Path(os.environ.get("MIETTE_DONNEES", "data")),
         # Pas de plafond par défaut depuis le 2026-10-17 (décision de Julien) :
         # la variable reste là pour en poser un si la dépense s'emballe.

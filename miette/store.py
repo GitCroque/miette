@@ -7,7 +7,8 @@ du jour pour le plafond quotidien. Une histoire supprimée depuis l'historique
 est seulement marquée : elle reste comptée dans le plafond du jour.
 
 Les dessins et les jeux ont leur propre table. Un jeu ne garde que de quoi le
-redessiner à l'identique (sujet et graine), un dessin de Claude garde son SVG :
+redessiner à l'identique (sujet et graine), un dessin de Claude garde son SVG,
+un dessin d'un modèle d'image garde son image déjà mise au trait (PNG 1 bit) :
 l'aperçu et l'impression doivent montrer le même ticket.
 """
 
@@ -50,7 +51,8 @@ CREATE TABLE IF NOT EXISTS dessins (
     graine INTEGER,
     imprime TEXT,
     favori INTEGER NOT NULL DEFAULT 0,
-    supprime TEXT
+    supprime TEXT,
+    image BLOB
 );
 """
 
@@ -67,6 +69,8 @@ LATER_COLUMNS = {
     "dessins": {
         "favori": "INTEGER NOT NULL DEFAULT 0",
         "supprime": "TEXT",
+        # Coloriages des modèles d'image, depuis le 2026-11-01.
+        "image": "BLOB",
     },
 }
 
@@ -100,6 +104,7 @@ class StoredDrawing:
     seed: int | None
     printed: str | None
     favorite: bool = False
+    image: bytes | None = None
 
 
 class Store:
@@ -219,15 +224,15 @@ class Store:
     # Dessins et jeux
 
     def add_drawing(self, *, kind: str, subject: str, svg: str | None = None,
-                    seed: int | None = None) -> StoredDrawing:
+                    seed: int | None = None, image: bytes | None = None) -> StoredDrawing:
         drawing = StoredDrawing(
             id=uuid.uuid4().hex[:12], created=datetime.now().isoformat(timespec="seconds"),
-            kind=kind, subject=subject, svg=svg, seed=seed, printed=None,
+            kind=kind, subject=subject, svg=svg, seed=seed, printed=None, image=image,
         )
         with self._lock:
             self._db.execute(
-                "INSERT INTO dessins (id, cree, genre, sujet, svg, graine) VALUES (?, ?, ?, ?, ?, ?)",
-                (drawing.id, drawing.created, kind, subject, svg, seed),
+                "INSERT INTO dessins (id, cree, genre, sujet, svg, graine, image) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (drawing.id, drawing.created, kind, subject, svg, seed, image),
             )
             self._db.commit()
         return drawing
@@ -290,4 +295,5 @@ def _drawing(row: sqlite3.Row) -> StoredDrawing:
     return StoredDrawing(
         id=row["id"], created=row["cree"], kind=row["genre"], subject=row["sujet"],
         svg=row["svg"], seed=row["graine"], printed=row["imprime"], favorite=bool(row["favori"]),
+        image=row["image"],
     )

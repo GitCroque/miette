@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from PIL import Image
 
-from . import claude, config, demande, drawing, printer, story, ticket
+from . import claude, config, demande, drawing, images, printer, story, ticket
 from .generators import dot_to_dot, find_them, maze
 from .store import Store, StoredDrawing, StoredStory
 
@@ -172,7 +172,8 @@ def _drawing_ticket(entry: StoredDrawing) -> Image.Image:
     """Le ticket complet, recomposé à l'identique pour l'aperçu comme pour l'impression."""
     day = date.fromisoformat(entry.created[:10])
     if entry.kind in ("coloriage", "imagier"):
-        return ticket.render_coloring(_picture(entry.svg), entry.subject, day)
+        picture = Image.open(io.BytesIO(entry.image)) if entry.image else _picture(entry.svg)
+        return ticket.render_coloring(picture, entry.subject, day)
     if entry.kind == "labyrinthe":
         sheet = maze.render(entry.subject, seed=entry.seed)
     elif entry.kind == "points":
@@ -372,6 +373,27 @@ def print_story(story_id: str) -> dict:
     return _public(store.story(entry.id))
 
 
+def _coloring(subject: str) -> dict:
+    """Le coloriage d'un modèle d'image s'il y a une clé OpenRouter, sinon celui de Claude.
+
+    Un échec du modèle d'image se rattrape par Claude : l'enfant attend devant
+    le téléphone, mieux vaut un dessin plus raide que pas de dessin.
+    """
+    if settings.openrouter_key:
+        try:
+            picture = images.draw(images.coloring_prompt(subject), key=settings.openrouter_key,
+                                  model=settings.coloring_model, width=ticket.TEXT_WIDTH)
+            log.info("coloriage dessiné par %s : %s", settings.coloring_model, subject)
+            return {"image": images.to_png(picture)}
+        except images.ImageError as exc:
+            log.warning("coloriage par %s impossible, repli sur Claude : %s", settings.coloring_model, exc)
+    try:
+        return {"svg": drawing.draw(drawing.coloring_prompt(subject), key=settings.anthropic_key,
+                                    model=settings.model)}
+    except claude.ClaudeError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
 @app.post("/api/dessins")
 def make_drawing(request: DrawingRequest) -> dict:
     """Prépare un dessin ou un jeu en aperçu, sans l'imprimer."""
@@ -381,11 +403,7 @@ def make_drawing(request: DrawingRequest) -> dict:
         _check_daily_limit()
         subject = request.sujet or drawing.pick_subject(
             store.recent_subjects(("coloriage", "imagier")), request.categorie, rng)
-        try:
-            svg = drawing.draw(drawing.coloring_prompt(subject), key=settings.anthropic_key, model=settings.model)
-        except claude.ClaudeError as exc:
-            raise HTTPException(502, str(exc)) from exc
-        entry = store.add_drawing(kind=kind, subject=subject, svg=svg)
+        entry = store.add_drawing(kind=kind, subject=subject, **_coloring(subject))
     elif kind == "labyrinthe":
         entry = store.add_drawing(kind=kind, subject=request.niveau or MAZE_LEVELS[0],
                                   seed=rng.randrange(1 << 31))
