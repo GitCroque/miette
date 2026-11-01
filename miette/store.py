@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS histoires (
     favori INTEGER NOT NULL DEFAULT 0,
     supprimee TEXT,
     illustration TEXT,
-    theme TEXT
+    theme TEXT,
+    illustration_image BLOB
 );
 CREATE TABLE IF NOT EXISTS dessins (
     id TEXT PRIMARY KEY,
@@ -65,6 +66,8 @@ LATER_COLUMNS = {
         "supprimee": "TEXT",
         "illustration": "TEXT",
         "theme": "TEXT",
+        # Illustrations des modèles d'image, depuis le 2026-11-01.
+        "illustration_image": "BLOB",
     },
     "dessins": {
         "favori": "INTEGER NOT NULL DEFAULT 0",
@@ -92,6 +95,12 @@ class StoredStory:
     favorite: bool = False
     illustration: str | None = None
     theme: str | None = None
+    # PNG 1 bit d'un modèle d'image ; `illustration` garde le SVG de Claude.
+    illustration_image: bytes | None = None
+
+    @property
+    def illustrated(self) -> bool:
+        return self.illustration is not None or self.illustration_image is not None
 
 
 @dataclass(frozen=True)
@@ -168,9 +177,11 @@ class Store:
                              (datetime.now().isoformat(timespec="seconds"), story_id))
             self._db.commit()
 
-    def set_illustration(self, story_id: str, svg: str) -> None:
+    def set_illustration(self, story_id: str, svg: str | None = None,
+                         image: bytes | None = None) -> None:
         with self._lock:
-            self._db.execute("UPDATE histoires SET illustration = ? WHERE id = ?", (svg, story_id))
+            self._db.execute("UPDATE histoires SET illustration = ?, illustration_image = ? WHERE id = ?",
+                             (svg, image, story_id))
             self._db.commit()
 
     def set_favorite(self, story_id: str, favorite: bool) -> None:
@@ -288,6 +299,7 @@ def _story(row: sqlite3.Row) -> StoredStory:
         paragraphs=json.loads(row["paragraphes"]), model=row["modele"],
         words=row["mots"], printed=row["imprimee"], favorite=bool(row["favori"]),
         illustration=row["illustration"], theme=row["theme"],
+        illustration_image=row["illustration_image"],
     )
 
 

@@ -35,11 +35,14 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
   (un sujet du quotidien tiré au sort, avec son nom en grand pour l'imagier),
   labyrinthe en quatre niveaux, points à relier, cherche et trouve. L'aperçu
   montre le ticket exact, rendu par le serveur en noir et blanc.
-- Les coloriages sont dessinés par un modèle d'image via l'[API Images
-  d'OpenRouter](https://openrouter.ai/docs/features/multimodal/image-generation)
+- Les coloriages et les illustrations sont dessinés par un modèle d'image via
+  l'[API Images d'OpenRouter](https://openrouter.ai/docs/features/multimodal/image-generation)
   (MAI Image 2.6 par défaut), mis au trait en 1 bit et gardés tels quels dans la
-  base. Sans clé OpenRouter, ou si le modèle échoue, Claude les dessine en SVG,
-  comme les illustrations des histoires.
+  base. Sans clé OpenRouter, ou si le modèle échoue, Claude les dessine en SVG.
+- Pour une illustration, le modèle d'image ne voit jamais l'histoire : Claude la
+  lit et décrit le dessin en quelques mots d'anglais, sans aucun nom. Si un
+  prénom ou un mot à majuscule des fiches s'y glisse quand même, rien ne part
+  chez OpenRouter et Claude dessine l'illustration lui-même.
 - Un plafond quotidien d'histoires et de coloriages peut être posé contre un
   bouton qui s'emballe (`MIETTE_LIMITE_JOUR`) ; il n'y en a pas par défaut. Les
   jeux, calculés sur place, n'y comptent jamais.
@@ -62,13 +65,14 @@ sérialise tous ses accès et garde l'état affiché quelques secondes en cache.
 | `MIETTE_IMPRIMANTE_PORT` | Port ESC/POS brut | `9100` |
 | `ANTHROPIC_API_KEY` | Clé de l'API Anthropic | aucun, obligatoire |
 | `MIETTE_MODELE` | Modèle Claude | `claude-opus-5-5` |
-| `OPENROUTER_API_KEY` | Clé OpenRouter pour les coloriages | aucun : coloriages par Claude |
-| `MIETTE_MODELE_COLORIAGE` | Modèle d'image des coloriages, identifiant OpenRouter | `microsoft/mai-image-2.6` |
+| `OPENROUTER_API_KEY` | Clé OpenRouter pour les coloriages et les illustrations | aucun : dessins par Claude |
+| `MIETTE_MODELE_COLORIAGE` | Modèle d'image des coloriages et des illustrations, identifiant OpenRouter | `microsoft/mai-image-2.6` |
 | `MIETTE_LIMITE_JOUR` | Plafond quotidien d'histoires et de coloriages | aucun : pas de plafond |
 | `MIETTE_DONNEES` | Dossier de la base (fiches et histoires) | `/data` dans l'image |
 
-Les dessins sont écrits par le même modèle, en SVG (effort moyen), puis
-nettoyés (seules les formes passent) et rendus en 1 bit avec resvg. À l'essai,
+En repli du modèle d'image, les dessins sont écrits par le même modèle Claude,
+en SVG (effort moyen), puis nettoyés (seules les formes passent) et rendus en
+1 bit avec resvg. À l'essai,
 un sujet seul sort net pour 1,5 à 3 centimes ; une scène à plusieurs
 personnages se brouille, d'où une illustration centrée sur un seul élément de
 l'histoire.

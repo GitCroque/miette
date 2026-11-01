@@ -4,7 +4,9 @@ Déroulé décidé le 2026-09-26 : choisir l'enfant (ou les deux), Surprise ou
 une occasion, lire l'aperçu, puis imprimer ou en demander une autre. Depuis le
 2026-10-17, même déroulé pour les coloriages (par thème, avec le nom du sujet
 en grand : l'ancien imagier y est fondu) et les jeux (labyrinthe, points à
-relier, cherche et trouve), et chaque histoire peut recevoir son illustration. Un champ libre accepte aussi une demande en clair
+relier, cherche et trouve), et chaque histoire peut recevoir son illustration.
+Depuis le 2026-11-01, coloriages et illustrations passent d'abord par un modèle
+d'image (voir images.py), Claude en repli. Un champ libre accepte aussi une demande en clair
 (« un coloriage de poule », « une histoire sur la tétine »).
 """
 
@@ -133,7 +135,7 @@ def _public(entry: StoredStory) -> dict:
         "date": entry.created,
         "imprimee": entry.printed,
         "favori": entry.favorite,
-        "illustration": entry.illustration is not None,
+        "illustration": entry.illustrated,
     }
 
 
@@ -335,19 +337,45 @@ def write_story(request: StoryRequest) -> dict:
     return _public(entry)
 
 
+def _illustration(entry: StoredStory) -> dict:
+    """L'illustration d'un modèle d'image s'il y a une clé OpenRouter, sinon celle de Claude.
+
+    Le modèle d'image ne reçoit que la description écrite par Claude, sans
+    aucun nom des fiches. Tout échec en route se rattrape par le SVG de Claude.
+    """
+    if settings.openrouter_key:
+        try:
+            scene = drawing.scene(entry.title, entry.paragraphs,
+                                  private=drawing.private_words(store.children()),
+                                  key=settings.anthropic_key, model=settings.model)
+            picture = images.draw(images.illustration_prompt(scene), key=settings.openrouter_key,
+                                  model=settings.coloring_model, width=ticket.TEXT_WIDTH)
+            log.info("histoire %s illustrée par %s", entry.id, settings.coloring_model)
+            return {"image": images.to_png(picture)}
+        except (claude.ClaudeError, images.ImageError) as exc:
+            log.warning("illustration par %s impossible, repli sur Claude : %s",
+                        settings.coloring_model, exc)
+    try:
+        return {"svg": drawing.draw(drawing.illustration_prompt(entry.title, entry.paragraphs),
+                                    key=settings.anthropic_key, model=settings.model)}
+    except claude.ClaudeError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+
+def _story_picture(entry: StoredStory) -> Image.Image | None:
+    if entry.illustration_image is not None:
+        return Image.open(io.BytesIO(entry.illustration_image))
+    return _picture(entry.illustration) if entry.illustration else None
+
+
 @app.post("/api/histoires/{story_id}/illustration")
 def illustrate_story(story_id: str) -> dict:
     """Dessine l'illustration d'une histoire déjà écrite, une fois pour toutes."""
     entry = store.story(story_id)
     if entry is None:
         raise HTTPException(404, "Histoire introuvable.")
-    if entry.illustration is None:
-        try:
-            svg = drawing.draw(drawing.illustration_prompt(entry.title, entry.paragraphs),
-                               key=settings.anthropic_key, model=settings.model)
-        except claude.ClaudeError as exc:
-            raise HTTPException(502, str(exc)) from exc
-        store.set_illustration(entry.id, svg)
+    if not entry.illustrated:
+        store.set_illustration(entry.id, **_illustration(entry))
         log.info("histoire %s illustrée", entry.id)
     return _public(store.story(entry.id))
 
@@ -355,10 +383,11 @@ def illustrate_story(story_id: str) -> dict:
 @app.get("/api/histoires/{story_id}/illustration.png", include_in_schema=False)
 def story_illustration(story_id: str) -> Response:
     entry = store.story(story_id)
-    if entry is None or entry.illustration is None:
+    picture = _story_picture(entry) if entry is not None else None
+    if picture is None:
         raise HTTPException(404, "Pas d'illustration.")
     # Une illustration ne change plus une fois dessinée.
-    return _png(_picture(entry.illustration), "private, max-age=604800, immutable")
+    return _png(picture, "private, max-age=604800, immutable")
 
 
 @app.post("/api/histoires/{story_id}/imprimer")
@@ -366,7 +395,7 @@ def print_story(story_id: str) -> dict:
     entry = store.story(story_id)
     if entry is None:
         raise HTTPException(404, "Histoire introuvable.")
-    picture = _picture(entry.illustration) if entry.illustration else None
+    picture = _story_picture(entry)
     _print(ticket.render_raster(entry.title, tuple(entry.paragraphs), _names(entry.children),
                                 date.fromisoformat(entry.created[:10]), picture))
     store.mark_printed(entry.id)

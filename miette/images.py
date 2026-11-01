@@ -1,4 +1,4 @@
-"""Coloriages dessinés par un modèle d'image, via l'API Images d'OpenRouter.
+"""Coloriages et illustrations dessinés par un modèle d'image, via l'API Images d'OpenRouter.
 
 Comparatif du 2026-11-01 (chat, camion de pompiers, girafe, rendus en 1 bit
 comme sur le ticket) : les modèles d'image battent nettement les SVG écrits
@@ -13,6 +13,9 @@ d'OpenAI n'en ont aucun.
 
 Le dessin est mis au trait dès réception, puis gardé tel quel dans la base :
 l'aperçu, l'impression et la réimpression montrent le même ticket.
+
+Une illustration part d'une description écrite par Claude, sans aucun nom
+(voir drawing.scene) : l'histoire elle-même ne quitte jamais Anthropic.
 """
 
 from __future__ import annotations
@@ -42,6 +45,15 @@ PROMPT = (
 )
 
 
+ILLUSTRATION = (
+    "Black and white illustration for a picture book for 2-year-olds: {scene}. "
+    "Cute and friendly, one or two characters at most, large, centered and filling the frame. "
+    "Very thick bold black outlines only, on a pure white background. "
+    "No shading, no gray, no hatching, no texture, no filled black areas, no text, no letters, "
+    "no border, no background scenery. Large simple closed shapes, children's coloring book style."
+)
+
+
 class ImageError(Exception):
     """Dessin impossible à obtenir d'OpenRouter : l'app se replie sur Claude."""
 
@@ -52,6 +64,10 @@ class UnusableImage(ImageError):
 
 def coloring_prompt(subject: str) -> str:
     return PROMPT.format(subject=drawing.noun(subject))
+
+
+def illustration_prompt(scene: str) -> str:
+    return ILLUSTRATION.format(scene=scene)
 
 
 def build_request(prompt: str, model: str) -> dict:

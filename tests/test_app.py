@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from miette import demande, drawing, images, printer, story
+from miette import claude, demande, drawing, images, printer, story
 
 LOU = {"prenom": "Lou", "naissance": "2024-10", "accord": "elle", "doudou": "Lapinou"}
 MAX = {"prenom": "Max", "naissance": "2024-12", "accord": "il"}
@@ -401,3 +401,38 @@ def test_coloring_falls_back_to_claude_when_the_image_model_fails(client, monkey
     data = client.post("/api/dessins", json={"genre": "coloriage", "sujet": "la poule"}).json()
     assert len(client.prompts) == 1 and "poule" in client.prompts[0]
     assert client.store.drawing(data["id"]).svg == CIRCLE
+
+
+def test_illustration_comes_from_the_image_model_with_no_name_sent(client, monkeypatch):
+    _with_openrouter(client, monkeypatch)
+    lou, = _children(client, LOU)
+    story_id = client.post("/api/histoires", json={"enfants": [lou]}).json()["id"]
+    monkeypatch.setattr(claude, "complete", lambda payload, c: "A little girl hugging a teddy rabbit")
+    asked = []
+
+    def fake_image(prompt, key, model, width):
+        asked.append(prompt)
+        return Image.new("1", (width, 300), 1)
+
+    monkeypatch.setattr(images, "draw", fake_image)
+    assert client.post(f"/api/histoires/{story_id}/illustration").json()["illustration"] is True
+    assert asked == [images.illustration_prompt("A little girl hugging a teddy rabbit")]
+    assert client.prompts == []  # Claude n'a dessiné aucun SVG
+    stored = client.store.story(story_id)
+    assert stored.illustration_image and stored.illustration is None
+    assert client.get(f"/api/histoires/{story_id}/illustration.png").headers["content-type"] == "image/png"
+    client.post(f"/api/histoires/{story_id}/imprimer")
+    assert client.printed[-1].height > 300
+
+
+def test_a_scene_naming_a_child_never_reaches_the_image_model(client, monkeypatch):
+    _with_openrouter(client, monkeypatch)
+    lou, = _children(client, LOU)
+    story_id = client.post("/api/histoires", json={"enfants": [lou]}).json()["id"]
+    monkeypatch.setattr(claude, "complete", lambda payload, c: "Lou hugging Lapinou")
+    asked = []
+    monkeypatch.setattr(images, "draw", lambda *a, **k: asked.append(a) or Image.new("1", (10, 10), 1))
+    assert client.post(f"/api/histoires/{story_id}/illustration").json()["illustration"] is True
+    assert asked == []
+    # Repli sur le SVG de Claude, qui lit l'histoire comme avant.
+    assert len(client.prompts) == 1 and client.store.story(story_id).illustration == CIRCLE

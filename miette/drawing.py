@@ -1,7 +1,13 @@
-"""Dessins au trait écrits par Claude en SVG : illustration, et coloriage de repli.
+"""Dessins au trait écrits par Claude en SVG, en repli du modèle d'image.
 
-Depuis le 2026-11-01, les coloriages viennent d'un modèle d'image quand une clé
-OpenRouter est posée (voir images.py) ; Claude les dessine encore sans elle.
+Depuis le 2026-11-01, coloriages et illustrations viennent d'un modèle d'image
+quand une clé OpenRouter est posée (voir images.py) ; Claude les dessine
+encore sans elle, ou quand le modèle d'image échoue.
+
+Pour une illustration, le modèle d'image ne reçoit jamais l'histoire : Claude
+la lit et décrit le dessin en quelques mots d'anglais, sans aucun nom
+(`scene`), et seuls ces mots partent chez OpenRouter. Un contrôle côté
+serveur bloque l'envoi si un mot propre des fiches s'y glisse quand même.
 
 Essai du 2026-10-17 avec Opus 5.5 en effort moyen : un sujet seul (chat,
 voiture, maison) sort net et reconnaissable pour 1,4 à 2,7 centimes, en 7 à
@@ -19,6 +25,7 @@ from __future__ import annotations
 import io
 import random
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 
 import anthropic
@@ -108,6 +115,73 @@ def illustration_prompt(title: str, paragraphs: tuple[str, ...] | list[str]) -> 
             "de l'histoire (le personnage principal, l'animal ou l'objet qui compte le plus), "
             "seul ou avec un seul autre élément, en grand. Pas de scène chargée ni de décor.\n\n"
             + "\n\n".join(paragraphs))
+
+
+SCENE_SYSTEM = """Tu choisis le dessin qui illustrera une histoire pour tout-petit, imprimée en noir et blanc sur un ticket de caisse.
+Un modèle d'image le dessinera d'après ta description, sans jamais voir l'histoire.
+Réponds par une seule ligne en anglais, de 6 à 20 mots, sans rien autour : ce qu'il faut dessiner.
+Un seul élément central de l'histoire (le personnage principal, l'animal ou l'objet qui compte le plus),
+seul ou avec un seul autre élément, en train de faire quelque chose de simple. Pas de décor.
+Aucun nom propre, jamais : ni prénom, ni nom de doudou, d'animal, de crèche ou de personne.
+Décris plutôt : « a little girl », « a little boy », « a toddler », « a teddy rabbit », « a grey cat ».
+Rien d'écrit à dessiner : ni mot, ni lettre, ni chiffre."""
+
+# Champs des fiches qui peuvent porter un nom : prénom, doudou, animaux, crèche, nounou, copains.
+PRIVATE_FIELDS = ("prenom", "doudou", "animaux", "creche", "nounou", "copains")
+MAX_SCENE = 200
+
+
+def _words(text: str) -> list[str]:
+    """Mots sans accents ni ponctuation, pour comparer « Chloé » et « Chloe »."""
+    plain = unicodedata.normalize("NFKD", text)
+    plain = "".join(c for c in plain if not unicodedata.combining(c))
+    return re.findall(r"[^\W\d_]+", plain)
+
+
+def private_words(children: list[dict]) -> set[str]:
+    """Les mots propres des fiches : les prénoms, et tout mot à majuscule des autres champs.
+
+    Un doudou « Pinpin, un lapin gris » donne « pinpin » : le reste est un nom
+    commun français, sans risque de se retrouver dans une description anglaise.
+    """
+    found = set()
+    for child in children:
+        found.update(w.lower() for w in _words(child.get("prenom", "")))
+        for field in PRIVATE_FIELDS[1:]:
+            found.update(w.lower() for w in _words(child.get(field, "")) if w[0].isupper())
+    return {w for w in found if len(w) > 1}
+
+
+def scene_request(title: str, paragraphs: tuple[str, ...] | list[str], model: str) -> dict:
+    return {
+        "model": model,
+        # Quelques mots à écrire : la marge sert à la réflexion, qui ne se coupe pas.
+        "max_tokens": 2000,
+        "output_config": {"effort": "low"},
+        "system": SCENE_SYSTEM,
+        "messages": [{"role": "user", "content": f"« {title} »\n\n" + "\n\n".join(paragraphs)}],
+        "betas": ["server-side-fallback-2026-07-01"],
+        "fallbacks": "default",
+    }
+
+
+def scene(title: str, paragraphs: tuple[str, ...] | list[str], *, private: set[str],
+          key: str, model: str, client: anthropic.Anthropic | None = None) -> str:
+    """Ce qu'il faut dessiner pour illustrer l'histoire, en anglais et sans aucun nom des fiches."""
+    owned = client is None
+    client = client or claude.client(key)
+    try:
+        raw = claude.complete(scene_request(title, paragraphs, model), client)
+    finally:
+        if owned:
+            client.close()
+    lines = [line.strip().strip("\"'`«»“”").strip() for line in raw.splitlines()]
+    description = next((line for line in lines if line), "").rstrip(".")
+    if not description or len(description) > MAX_SCENE:
+        raise DrawingError("Le sujet de l'illustration est illisible.")
+    if private & {w.lower() for w in _words(description)}:
+        raise DrawingError("Le sujet de l'illustration cite un nom des fiches : rien n'est envoyé.")
+    return description
 
 
 def build_request(prompt: str, model: str) -> dict:

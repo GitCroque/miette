@@ -101,3 +101,34 @@ def test_trim_drops_the_blank_above_and_below_a_wide_subject():
     trimmed = drawing.trim(image)
     assert trimmed.width == 484 and trimmed.height < 160
     assert drawing.ink(trimmed) > drawing.ink(image)
+
+
+PROFILES = [{"prenom": "Chloé", "doudou": "Pinpin, un lapin gris", "creche": "Les Petits Loups",
+             "copains": "Léo et Marie-Lou", "animaux": "un chat"}]
+
+
+def test_private_words_are_the_names_and_capitalized_words_of_the_profiles():
+    words = drawing.private_words(PROFILES)
+    assert {"chloe", "pinpin", "petits", "loups", "leo", "marie", "lou"} <= words
+    # Les noms communs restent permis : un lapin gris peut être dessiné.
+    assert not {"lapin", "gris", "chat", "un"} & words
+
+
+def test_scene_is_one_clean_line_and_sends_the_story_to_claude_only():
+    client, calls = _client(['"A little girl hugging a grey teddy rabbit."\n'])
+    scene = drawing.scene("Le doudou", ["Chloé serre Pinpin."], private=drawing.private_words(PROFILES),
+                          key="k", model="m", client=client)
+    assert scene == "A little girl hugging a grey teddy rabbit"
+    assert "Chloé serre Pinpin." in calls[0].content.decode()
+
+
+@pytest.mark.parametrize("answer, message", [
+    ("Chloe hugging her rabbit", "nom des fiches"),
+    ("A little girl hugging Pinpin", "nom des fiches"),
+    ("", "illisible"),
+])
+def test_a_scene_with_a_name_or_nothing_is_refused(answer, message):
+    client, _ = _client([answer])
+    with pytest.raises(drawing.DrawingError, match=message):
+        drawing.scene("Titre", ["Texte."], private=drawing.private_words(PROFILES),
+                      key="k", model="m", client=client)

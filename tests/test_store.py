@@ -36,8 +36,12 @@ def test_illustrations_and_drawings(tmp_path):
     store = Store(tmp_path)
     story = store.add_story(children=["x"], occasion=None, title="Titre",
                             paragraphs=("Texte.",), model="m", words=1)
+    assert store.story(story.id).illustrated is False
     store.set_illustration(story.id, "<svg/>")
     assert store.story(story.id).illustration == "<svg/>"
+    store.set_illustration(story.id, image=b"png")
+    stored = store.story(story.id)
+    assert stored.illustration_image == b"png" and stored.illustration is None and stored.illustrated
 
     coloring = store.add_drawing(kind="coloriage", subject="le chat", svg="<svg/>")
     store.add_drawing(kind="labyrinthe", subject="facile", seed=4)
