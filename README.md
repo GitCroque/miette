@@ -35,6 +35,11 @@ documents, elle sème des miettes de papier qu'un enfant ramasse et garde.
   (un sujet du quotidien tiré au sort, avec son nom en grand pour l'imagier),
   labyrinthe en quatre niveaux, points à relier, cherche et trouve. L'aperçu
   montre le ticket exact, rendu par le serveur en noir et blanc.
+- Dans le labyrinthe, un personnage attend à l'entrée et son but à la sortie
+  (« Aide le hérisson à retrouver sa pomme ») ; le cherche et trouve cache des
+  petits dessins. Ces dessins ont été tirés une fois de MAI Image 2.6 et sont
+  rangés dans `miette/dessins/` : les jeux restent calculés sur place,
+  instantanés et gratuits, et la grille du labyrinthe est toujours vérifiée.
 - Les coloriages et les illustrations sont dessinés par un modèle d'image via
   l'[API Images d'OpenRouter](https://openrouter.ai/docs/features/multimodal/image-generation)
   (MAI Image 2.6 par défaut), mis au trait en 1 bit et gardés tels quels dans la
@@ -107,9 +112,11 @@ MIETTE_IMPRIMANTE=... ANTHROPIC_API_KEY=... .venv/bin/uvicorn miette.app:app --r
 Le dossier `outils/` contient les scripts d'atelier : `mire.py` et
 `premier_ticket.py` (mire de référence de l'imprimante), `preview.py` (tous
 les jeux en PNG avec leurs contrôles, pour les juger sans papier),
-`icones.py` (icônes de l'app web).
+`icones.py` (icônes de l'app web), `dessins_fixes.py` (dessins des jeux, à
+tirer de nouveau après l'ajout d'un personnage ou d'un symbole).
 
 ## Licence
 
 Code sous licence MIT. Polices Fredoka et Gelasio sous SIL Open Font License,
-voir `miette/fonts/`.
+voir `miette/fonts/`. Les dessins de `miette/dessins/` ont été générés par
+MAI Image 2.6.

@@ -1,16 +1,26 @@
 """Cherche et trouve.
 
-Réutilise les polygones de `dot_to_dot` comme symboles : ce sont les mêmes
-dessins que l'enfant relie ailleurs, donc elle les reconnaît déjà, et il n'y a
-qu'un seul jeu de formes à maintenir.
+Les symboles portent les noms des formes des points à relier. Ils en étaient
+les polygones jusqu'au 2026-11-01 ; ce sont depuis des dessins de MAI Image
+2.6, plus vivants (décision de Julien), tirés une fois par
+outils/dessins_fixes.py. Le nombre et la place des cibles restent tirés ici.
 """
 
 from __future__ import annotations
 
 import random
 
-from ..canvas import MARGIN, WIDTH_DOTS, Sheet
-from .dot_to_dot import SHAPES
+from ..canvas import MARGIN, WIDTH_DOTS, Sheet, load_drawing
+
+# Nom de la forme et fichier de son dessin dans miette/dessins/cherche.
+SYMBOLS = {
+    "étoile": "etoile",
+    "maison": "maison",
+    "cœur": "coeur",
+    "poisson": "poisson",
+    "sapin": "sapin",
+    "champignon": "champignon",
+}
 
 # Accord du nom au pluriel dans la consigne. Une enfant de quatre ans ne lit
 # pas, mais l'adulte qui lit à voix haute, si.
@@ -27,7 +37,7 @@ PLURALS = {
 def render(target: str = "étoile", occurrences: int = 3, cols: int = 4,
            rows: int = 6, seed: int | None = None) -> tuple[Sheet, list[int]]:
     """Retourne la planche et les cases où se cache la cible, pour contrôle."""
-    if target not in SHAPES:
+    if target not in SYMBOLS:
         raise KeyError(f"forme inconnue : {target}")
     total = cols * rows
     if not 1 <= occurrences <= total // 3:
@@ -37,7 +47,7 @@ def render(target: str = "étoile", occurrences: int = 3, cols: int = 4,
         )
 
     rng = random.Random(seed)
-    others = [name for name in SHAPES if name != target]
+    others = [name for name in SYMBOLS if name != target]
     grid = [rng.choice(others) for _ in range(total)]
     slots = rng.sample(range(total), occurrences)
     for slot in slots:
@@ -54,7 +64,6 @@ def render(target: str = "étoile", occurrences: int = 3, cols: int = 4,
     sheet.centered_text(62, f"Entoure les {occurrences} {plural}", 28)
     sheet.line(MARGIN, 124, WIDTH_DOTS - MARGIN, 124, 3)
 
-    size = cell * 0.62
     for index, name in enumerate(grid):
         col, row = index % cols, index // cols
         # Décalage aléatoire pour casser l'alignement au cordeau, qui rend la
@@ -63,19 +72,7 @@ def render(target: str = "étoile", occurrences: int = 3, cols: int = 4,
         jitter_y = rng.uniform(-0.07, 0.07) * cell
         cx = left + col * cell + cell / 2 + jitter_x
         cy = top + row * cell + cell / 2 + jitter_y
-        _draw_shape(sheet, name, cx, cy, size)
+        art = load_drawing("cherche", SYMBOLS[name])
+        sheet.picture(art, cx - art.width / 2, cy - art.height / 2)
 
     return sheet, sorted(slots)
-
-
-def _draw_shape(sheet: Sheet, name: str, cx: float, cy: float, size: float) -> None:
-    """Dessine un polygone normalisé centré, sans déformer ses proportions."""
-    points = SHAPES[name]
-    xs = [x for x, _ in points]
-    ys = [y for _, y in points]
-    width = max(xs) - min(xs)
-    height = max(ys) - min(ys)
-    scale = size / max(width, height)
-    ox = cx - (min(xs) + width / 2) * scale
-    oy = cy - (min(ys) + height / 2) * scale
-    sheet.polygon([(ox + x * scale, oy + y * scale) for x, y in points], width=4)

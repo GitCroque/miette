@@ -21,7 +21,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 WIDTH_DOTS = 512
 DOTS_PER_MM = 7
@@ -32,6 +32,9 @@ MIN_STROKE = 3
 
 WHITE = 255
 BLACK = 0
+
+# Dessins fixes des jeux, tirés une fois de MAI Image 2.6 (outils/dessins_fixes.py).
+DRAWINGS = Path(__file__).parent / "dessins"
 
 # La police ronde embarquée pour les histoires : l'image Docker n'a aucune
 # police système, et les jeux doivent parler comme les histoires.
@@ -51,6 +54,13 @@ def load_font(size_dots: int) -> ImageFont.FreeTypeFont:
     axes = loaded.get_variation_axes()
     loaded.set_variation_by_axes([FONT_WEIGHT if i == 0 else a["default"] for i, a in enumerate(axes)])
     return loaded
+
+
+@lru_cache(maxsize=64)
+def load_drawing(folder: str, name: str) -> Image.Image:
+    """Un dessin fixe des jeux, en 1 bit, à sa taille d'impression."""
+    with Image.open(DRAWINGS / folder / f"{name}.png") as image:
+        return image.convert("1")
 
 
 class Sheet:
@@ -107,6 +117,16 @@ class Sheet:
         if close:
             scaled.append(scaled[0])
         self._draw.line(scaled, fill=BLACK, width=self._stroke(width), joint="curve")
+
+    def picture(self, image: Image.Image, x: float, y: float) -> None:
+        """Pose un dessin 1 bit, coin haut gauche en (x, y), sans effacer ce qui est dessous."""
+        big = image.convert("L").resize((image.width * SUPERSAMPLE, image.height * SUPERSAMPLE),
+                                        Image.NEAREST)
+        left, top = round(self._s(x)), round(self._s(y))
+        if left < 0 or top < 0 or left + big.width > self._image.width or top + big.height > self._image.height:
+            raise ValueError("dessin hors de la planche")
+        region = self._image.crop((left, top, left + big.width, top + big.height))
+        self._image.paste(ImageChops.darker(region, big), (left, top))
 
     def text(self, x: float, y: float, value: str, size_dots: int,
              anchor: str = "la") -> None:

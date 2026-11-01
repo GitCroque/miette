@@ -5,6 +5,12 @@ chemin entre deux cellules, donc jamais de boucle et jamais d'impasse
 infranchissable. La solvabilité est en outre vérifiée par un parcours en
 largeur avant de rendre l'image, parce qu'un labyrinthe sans issue imprimé
 devant une enfant qui attend, c'est le genre de bug qu'on ne rattrape pas.
+
+Depuis le 2026-11-01 (décision de Julien), un personnage attend à l'entrée et
+son but à la sortie, avec la consigne que l'adulte lit à voix haute : « Aide
+le hérisson à retrouver sa pomme ». Les dessins viennent de MAI Image 2.6,
+tirés une fois (outils/dessins_fixes.py) : la grille reste calculée ici, le
+jeu reste instantané et ne coûte rien.
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ import random
 from collections import deque
 from dataclasses import dataclass
 
-from ..canvas import MARGIN, WIDTH_DOTS, Sheet
+from ..canvas import MARGIN, WIDTH_DOTS, Sheet, load_drawing
 
 NORTH, EAST, SOUTH, WEST = 1, 2, 4, 8
 OPPOSITE = {NORTH: SOUTH, SOUTH: NORTH, EAST: WEST, WEST: EAST}
@@ -27,6 +33,28 @@ LEVELS = {
     "moyen": (6, 11),
     "costaud": (7, 14),
 }
+
+
+# Personnage, son nom, son but, et le but tel que la consigne le dit. Le tirage
+# suit la graine du labyrinthe : ajouter une paire change le personnage d'une
+# réimpression ancienne, jamais sa grille.
+PAIRS = (
+    ("herisson", "le hérisson", "pomme", "sa pomme"),
+    ("lapin", "le lapin", "carotte", "sa carotte"),
+    ("souris", "la souris", "fromage", "son fromage"),
+    ("abeille", "l'abeille", "fleur", "sa fleur"),
+    ("chien", "le chien", "os", "son os"),
+    ("ecureuil", "l'écureuil", "pin", "sa pomme de pin"),
+    ("ours", "l'ours", "miel", "son pot de miel"),
+    ("singe", "le singe", "banane", "sa banane"),
+    ("chat", "le chat", "pelote", "sa pelote de laine"),
+    ("poussin", "le poussin", "poule", "sa maman"),
+    ("escargot", "l'escargot", "salade", "sa salade"),
+)
+
+TITLE_SIZE = 28
+LINE_HEIGHT = 36
+GAP = 8
 
 
 @dataclass
@@ -89,21 +117,49 @@ def _shortest_path(cols: int, rows: int, walls: list[list[int]]) -> int | None:
     return None
 
 
-def render(level: str = "facile", seed: int | None = None,
-           title: str = "Le labyrinthe") -> Sheet:
+def pair_for(seed: int | None) -> tuple[str, str, str, str]:
+    return PAIRS[random.Random(seed).randrange(len(PAIRS))]
+
+
+def _wrap(sheet: Sheet, text: str, size: int, width: float) -> list[str]:
+    lines, current = [], ""
+    for word in text.split():
+        trial = f"{current} {word}".strip()
+        if current and sheet.text_width(trial, size) > width:
+            lines.append(current)
+            current = word
+        else:
+            current = trial
+    return lines + [current] if current else lines
+
+
+def render(level: str = "facile", seed: int | None = None, title: str | None = None) -> Sheet:
     cols, rows = LEVELS[level]
     maze = generate(cols, rows, seed)
+    hero_file, hero, goal_file, goal = pair_for(seed)
+    hero_art = load_drawing("labyrinthe", hero_file)
+    goal_art = load_drawing("labyrinthe", goal_file)
 
     stroke = 4
     cell = (WIDTH_DOTS - 2 * MARGIN) // cols
     grid_width = cell * cols
     left = (WIDTH_DOTS - grid_width) // 2
-    title_height = 78
-    top = title_height
-    height = top + cell * rows + 56
+
+    # Le personnage juste au-dessus de l'entrée, la consigne à sa droite.
+    hero_x = max(MARGIN, round(left + cell / 2 - hero_art.width / 2))
+    text_x = hero_x + hero_art.width + 14
+    lines = _wrap(Sheet(1), title or f"Aide {hero} à retrouver {goal}", TITLE_SIZE,
+                  WIDTH_DOTS - MARGIN - text_x)
+    band = max(hero_art.height, len(lines) * LINE_HEIGHT)
+    top = MARGIN + band + GAP
+    bottom = top + cell * rows
+    height = bottom + GAP + goal_art.height + MARGIN
 
     sheet = Sheet(height)
-    sheet.centered_text(18, title, 34)
+    sheet.picture(hero_art, hero_x, top - GAP - hero_art.height)
+    text_top = MARGIN + (band - len(lines) * LINE_HEIGHT) / 2
+    for index, line in enumerate(lines):
+        sheet.text(text_x, text_top + index * LINE_HEIGHT, line, TITLE_SIZE)
 
     for row in range(rows):
         for col in range(cols):
@@ -124,21 +180,10 @@ def render(level: str = "facile", seed: int | None = None,
             if maze.has_wall(col, row, SOUTH) and not exit_:
                 sheet.line(x0, y1, x1, y1, stroke)
 
-    # Repères : un rond plein à l'entrée, une étoile à la sortie.
-    sheet.ellipse(left + cell / 2, top + cell / 2, cell * 0.18, fill=True)
-    _star(sheet, left + grid_width - cell / 2, top + cell * rows - cell / 2, cell * 0.30)
-
-    baseline = top + cell * rows + 14
-    sheet.centered_text(baseline, f"{maze.path_length} cases à traverser", 22)
+    # Le but juste sous la sortie, la longueur du chemin à sa gauche.
+    goal_x = min(WIDTH_DOTS - MARGIN - goal_art.width,
+                 round(left + grid_width - cell / 2 - goal_art.width / 2))
+    sheet.picture(goal_art, goal_x, bottom + GAP)
+    sheet.text(left, bottom + GAP + goal_art.height / 2, f"{maze.path_length} cases à traverser",
+               22, anchor="lm")
     return sheet
-
-
-def _star(sheet: Sheet, cx: float, cy: float, radius: float) -> None:
-    import math
-
-    points = []
-    for index in range(10):
-        angle = -math.pi / 2 + index * math.pi / 5
-        reach = radius if index % 2 == 0 else radius * 0.45
-        points.append((cx + reach * math.cos(angle), cy + reach * math.sin(angle)))
-    sheet.polygon(points, width=3)

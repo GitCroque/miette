@@ -1,6 +1,9 @@
 from datetime import date
 
-from miette import drawing, ticket
+import pytest
+from PIL import Image
+
+from miette import canvas, drawing, ticket
 from miette.generators import dot_to_dot, find_them, maze
 
 PARAGRAPHS = (
@@ -73,3 +76,31 @@ def test_drawing_tickets():
     illustrated = ticket.render_raster("Titre", PARAGRAPHS, "Lou", date(2026, 10, 17), picture)
     plain = ticket.render_raster("Titre", PARAGRAPHS, "Lou", date(2026, 10, 17))
     assert illustrated.height >= plain.height + picture.height
+
+
+def test_every_maze_pair_and_symbol_has_its_drawing():
+    names = [name for pair in maze.PAIRS for name in (pair[0], pair[2])]
+    assert len(set(names)) == len(names)
+    for name in names:
+        art = canvas.load_drawing("labyrinthe", name)
+        assert art.mode == "1" and max(art.size) <= 130
+    # Le cherche et trouve garde les noms des formes des points à relier.
+    assert set(find_them.SYMBOLS) == set(dot_to_dot.SHAPES)
+    for name in find_them.SYMBOLS.values():
+        art = canvas.load_drawing("cherche", name)
+        # Une case fait 120 points : le dessin et son décalage doivent y tenir.
+        assert art.mode == "1" and max(art.size) <= 86
+
+
+def test_a_maze_keeps_its_hero_from_its_seed():
+    assert maze.pair_for(5) == maze.pair_for(5)
+    assert len({maze.pair_for(seed) for seed in range(60)}) > 5
+
+
+def test_a_picture_darkens_the_sheet_and_stays_inside_it():
+    sheet = canvas.Sheet(40, 40)
+    sheet.picture(Image.new("1", (10, 10), 0), 5, 5)
+    bits = sheet.to_bilevel()
+    assert bits.getpixel((10, 10)) == 0 and bits.getpixel((30, 30)) == 255
+    with pytest.raises(ValueError):
+        sheet.picture(Image.new("1", (10, 10), 0), 35, 35)
