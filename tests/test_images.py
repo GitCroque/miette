@@ -92,3 +92,13 @@ def test_draw_does_not_retry_an_outage(monkeypatch):
     with pytest.raises(images.ImageError, match="injoignable"):
         images.draw("Coloriage", key="cle", model="m", width=484)
     assert len(calls) == 1
+
+
+def test_a_moderation_refusal_is_named(monkeypatch):
+    def refuse(body, key):
+        raise urllib.error.HTTPError(images.URL, 400, "Bad Request", {}, io.BytesIO(
+            b'{"error":{"message":"Azure MAI blocked this request through content moderation.","code":400}}'))
+
+    monkeypatch.setattr(images, "_post", refuse)
+    with pytest.raises(images.ImageError, match="modération"):
+        images.fetch("Illustration", key="cle", model="m")

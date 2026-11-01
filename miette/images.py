@@ -83,6 +83,13 @@ def _post(body: dict, key: str) -> dict:
         return json.load(response)
 
 
+def _error_text(exc: urllib.error.HTTPError) -> str:
+    try:
+        return exc.read().decode(errors="replace").lower()
+    except (OSError, AttributeError):
+        return ""
+
+
 def fetch(prompt: str, *, key: str, model: str) -> bytes:
     """Demande une image et rend ses octets, tels qu'envoyés par le modèle."""
     if not key:
@@ -96,6 +103,9 @@ def fetch(prompt: str, *, key: str, model: str) -> bytes:
             raise ImageError("Crédit OpenRouter épuisé.") from exc
         if exc.code == 404:
             raise ImageError(f"{model} indisponible avec les règles du compte OpenRouter.") from exc
+        if exc.code == 400 and "moderation" in _error_text(exc):
+            # Constaté le 2026-11-01 sur « une petite fille qui rit dans son bain ».
+            raise ImageError("Dessin refusé par la modération du fournisseur.") from exc
         raise ImageError(f"OpenRouter a répondu {exc.code}.") from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise ImageError(f"OpenRouter injoignable : {type(exc).__name__}.") from exc

@@ -124,7 +124,9 @@ Un seul élément central de l'histoire (le personnage principal, l'animal ou l'
 seul ou avec un seul autre élément, en train de faire quelque chose de simple. Pas de décor.
 Aucun nom propre, jamais : ni prénom, ni nom de doudou, d'animal, de crèche ou de personne.
 Décris plutôt : « a little girl », « a little boy », « a toddler », « a teddy rabbit », « a grey cat ».
-Rien d'écrit à dessiner : ni mot, ni lettre, ni chiffre."""
+Rien d'écrit à dessiner : ni mot, ni lettre, ni chiffre.
+Jamais un enfant au bain, déshabillé, à la toilette ou au change : la modération du modèle d'image refuse
+ces scènes. Dessine alors l'objet qui compte (le canard en plastique, la serviette, le pot)."""
 
 # Champs des fiches qui peuvent porter un nom : prénom, doudou, animaux, crèche, nounou, copains.
 PRIVATE_FIELDS = ("prenom", "doudou", "animaux", "creche", "nounou", "copains")
